@@ -48,8 +48,6 @@ def log_pool(vectors: list[tuple[float, ...]], weights: list[float]) -> tuple[fl
 def expected_goals(
     elo_a: float,
     elo_b: float,
-    fifa_z_a: float = 0,
-    fifa_z_b: float = 0,
     host_a: bool = False,
     host_b: bool = False,
     rest_a: float = 0,
@@ -64,7 +62,7 @@ def expected_goals(
 ) -> tuple[float, float]:
     from world_cup_api.modeling.context_params import rest_curve, travel_curve
 
-    difference = 1.15 * (elo_a - elo_b) / 400 + 0.12 * (fifa_z_a - fifa_z_b)
+    difference = 1.15 * (elo_a - elo_b) / 400
     host_delta = 0.13 * int(host_a) - 0.13 * int(host_b)
     rest_delta = beta_rest * (rest_curve(rest_a, cap=rest_cap) - rest_curve(rest_b, cap=rest_cap))
     travel_delta = beta_travel * (travel_curve(travel_b, ref=travel_ref) - travel_curve(travel_a, ref=travel_ref))
@@ -134,7 +132,12 @@ def one_x_two(matrix: np.ndarray) -> tuple[float, float, float]:
     return float(np.tril(matrix, -1).sum()), float(np.trace(matrix)), float(np.triu(matrix, 1).sum())
 
 
-def blend(model: tuple[float, ...], market: tuple[float, ...] | None, alpha: float = 0.7) -> tuple[float, ...]:
+def blend(
+    model: tuple[float, ...],
+    market: tuple[float, ...] | None,
+    *,
+    alpha: float = 0.85,
+) -> tuple[float, ...]:
     if market is None:
         return model
     return log_pool([market, model], [alpha, 1 - alpha])
@@ -155,8 +158,6 @@ def build_forecast(
     market: tuple[float, float, float] | None = None,
     host_a: bool = False,
     host_b: bool = False,
-    fifa_z_a: float = 0,
-    fifa_z_b: float = 0,
     rest_a: float = 0,
     rest_b: float = 0,
     travel_a: float = 0,
@@ -167,15 +168,16 @@ def build_forecast(
     beta_travel: float = 0.05,
     travel_ref: float = 3500.0,
     goal_dispersion: float = 0.0,
+    market_blend_alpha: float = 0.85,
 ) -> MatchForecast:
     lambda_a, lambda_b = expected_goals(
-        elo_a, elo_b, fifa_z_a, fifa_z_b, host_a, host_b,
-        rest_a, rest_b, travel_a, travel_b,
+        elo_a, elo_b, host_a=host_a, host_b=host_b,
+        rest_a=rest_a, rest_b=rest_b, travel_a=travel_a, travel_b=travel_b,
         beta_rest=beta_rest, rest_cap=rest_cap, beta_travel=beta_travel, travel_ref=travel_ref,
     )
     raw_matrix = score_matrix(lambda_a, lambda_b, goal_dispersion=goal_dispersion)
     model = one_x_two(raw_matrix)
-    final = blend(model, market)
+    final = blend(model, market, alpha=market_blend_alpha)
     matrix = reweight_score_matrix(raw_matrix, final)
     return MatchForecast(lambda_a, lambda_b, model, market, final, tuple(tuple(float(v) for v in row) for row in matrix))
 

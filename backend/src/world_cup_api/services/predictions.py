@@ -8,9 +8,11 @@ from sqlalchemy.orm import Session
 
 from world_cup_api.db.models import BookmakerOdds, Match, PredictionMarketPrice, Team, TeamRating
 from world_cup_api.domain.host_advantage import venue_home_flags
+from world_cup_api.domain.team_strength import SYNTHETIC_BOOKMAKERS, fuse_strength
 from world_cup_api.domain.match_context import group_match_context
 from world_cup_api.modeling.context_params import DEFAULT_CONTEXT_PARAMS
 from world_cup_api.modeling.prediction import MatchForecast, build_forecast, devig, log_pool
+from world_cup_api.services.champion_market_sync import champion_probs_by_team_id
 from world_cup_api.services.tournament_elo import team_elo
 
 
@@ -30,7 +32,7 @@ def _group_match_context(db: Session, match: Match) -> dict[str, float]:
     return group_match_context(payload, fifa_by_id).get(match.id, {})
 
 
-def forecast_match(db: Session, match_id: int) -> tuple[Match, MatchForecast, list[dict]]:
+def forecast_match(db: Session, match_id: int) -> tuple[Match, MatchForecast, list[dict], bool]:
     match = db.get(Match, match_id)
     if match is None or match.team_a_id is None or match.team_b_id is None:
         raise LookupError("Match not found or teams are not known")
@@ -38,17 +40,30 @@ def forecast_match(db: Session, match_id: int) -> tuple[Match, MatchForecast, li
     team_b = db.get(Team, match.team_b_id)
     if team_a is None or team_b is None:
         raise LookupError("Match teams are not known")
-    elo_a = team_elo(db, match.tournament_id, match.team_a_id)
-    elo_b = team_elo(db, match.tournament_id, match.team_b_id)
-    rank_a = _latest_fifa_rank(db, match.team_a_id, 50)
-    rank_b = _latest_fifa_rank(db, match.team_b_id, 50)
-    market, sources = _market_consensus(db, match_id)
+    params = DEFAULT_CONTEXT_PARAMS
+    champion_probs = champion_probs_by_team_id(db)
+    elo_a = fuse_strength(
+        team_elo(db, match.tournament_id, match.team_a_id),
+        _latest_fifa_rank(db, match.team_a_id, 50),
+        fifa_weight=params.fifa_strength_weight,
+        champion_prob=champion_probs.get(match.team_a_id),
+        champion_weight=params.champion_strength_weight,
+        champion_field_size=params.champion_field_size,
+    )
+    elo_b = fuse_strength(
+        team_elo(db, match.tournament_id, match.team_b_id),
+        _latest_fifa_rank(db, match.team_b_id, 50),
+        fifa_weight=params.fifa_strength_weight,
+        champion_prob=champion_probs.get(match.team_b_id),
+        champion_weight=params.champion_strength_weight,
+        champion_field_size=params.champion_field_size,
+    )
+    market, sources, has_external_market = _market_consensus(db, match_id)
     host_a, host_b = venue_home_flags(team_a.country_code, team_b.country_code, match.host_country)
     ctx = _group_match_context(db, match)
-    params = DEFAULT_CONTEXT_PARAMS
+    blend_alpha = params.market_blend_alpha if has_external_market else 0.0
     return match, build_forecast(
         elo_a, elo_b, market, host_a, host_b,
-        fifa_z_a=(50 - rank_a) / 15, fifa_z_b=(50 - rank_b) / 15,
         rest_a=ctx.get("rest_a", 0.0),
         rest_b=ctx.get("rest_b", 0.0),
         travel_a=ctx.get("travel_a", 0.0),
@@ -58,7 +73,8 @@ def forecast_match(db: Session, match_id: int) -> tuple[Match, MatchForecast, li
         beta_travel=params.beta_travel,
         travel_ref=params.travel_ref_km,
         goal_dispersion=params.goal_dispersion,
-    ), sources
+        market_blend_alpha=blend_alpha,
+    ), sources, has_external_market
 
 
 def _latest_rating(db: Session, team_id: int, kind: str, default: float) -> float:
@@ -79,7 +95,7 @@ def _latest_fifa_rank(db: Session, team_id: int, default: float) -> float:
     return float(rating.rank if rating.rank is not None else rating.rating_value)
 
 
-def _market_consensus(db: Session, match_id: int) -> tuple[tuple[float, float, float] | None, list[dict]]:
+def _market_consensus(db: Session, match_id: int) -> tuple[tuple[float, float, float] | None, list[dict], bool]:
     rows = db.scalars(select(BookmakerOdds).where(BookmakerOdds.match_id == match_id,
                                                    BookmakerOdds.market_type == "1X2")
                       .order_by(BookmakerOdds.snapshot_at.desc())).all()
@@ -90,6 +106,8 @@ def _market_consensus(db: Session, match_id: int) -> tuple[tuple[float, float, f
     sources: list[dict] = []
     seen_books: set[str] = set()
     for (book, timestamp), selections in grouped.items():
+        if book in SYNTHETIC_BOOKMAKERS:
+            continue
         if book in seen_books or not all(key in selections for key in ("team_a", "draw", "team_b")):
             continue
         odds = [selections[key].decimal_odds for key in ("team_a", "draw", "team_b")]
@@ -125,5 +143,5 @@ def _market_consensus(db: Session, match_id: int) -> tuple[tuple[float, float, f
                         "normalized_prices": vector})
         seen_platforms.add(platform)
     if not family_vectors:
-        return None, []
-    return log_pool(family_vectors, family_weights), sources  # type: ignore[return-value]
+        return None, [], False
+    return log_pool(family_vectors, family_weights), sources, True  # type: ignore[return-value]

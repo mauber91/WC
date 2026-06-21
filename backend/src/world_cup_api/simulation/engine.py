@@ -31,10 +31,12 @@ from world_cup_api.domain.group_situation import (
     should_rotate_team,
 )
 from world_cup_api.domain.standings import MatchRecord, StandingRow, calculate_group_table, rank_third_place
+from world_cup_api.domain.team_strength import fuse_strength
 from world_cup_api.domain.tournament_elo import build_elo_table
 from world_cup_api.domain.venues import team_base_camps
 from world_cup_api.modeling.context_params import DEFAULT_CONTEXT_PARAMS, elo_sigma
 from world_cup_api.modeling.prediction import MatchForecast, build_forecast, knockout_winner
+from world_cup_api.services.champion_market_sync import champion_probs_by_team_id
 from world_cup_api.services.tournament_elo import baseline_elos, current_tournament_elos, team_elo
 
 
@@ -52,6 +54,10 @@ def _context_params_dict() -> dict[str, float | int]:
         "rotation_elo_eliminated": params.rotation_elo_eliminated,
         "collusion_draw_boost": params.collusion_draw_boost,
         "goal_dispersion": params.goal_dispersion,
+        "fifa_strength_weight": params.fifa_strength_weight,
+        "champion_strength_weight": params.champion_strength_weight,
+        "champion_field_size": params.champion_field_size,
+        "market_blend_alpha": params.market_blend_alpha,
         "clinch_points": params.clinch_points,
         "elim_points": params.elim_points,
     }
@@ -80,18 +86,34 @@ def _build_forecast_matrix(
         raise LookupError("Match teams are not known")
     rating_a = elo_a if elo_a is not None else team_elo(db, match.tournament_id, match.team_a_id)
     rating_b = elo_b if elo_b is not None else team_elo(db, match.tournament_id, match.team_b_id)
-    market, _ = _market_consensus(db, match.id)
-    host_a, host_b = venue_home_flags(team_a.country_code, team_b.country_code, match.host_country)
     params = DEFAULT_CONTEXT_PARAMS
+    champion_probs = champion_probs_by_team_id(db)
+    rating_a = fuse_strength(
+        rating_a,
+        _latest_fifa_rank(db, match.team_a_id, 50),
+        fifa_weight=params.fifa_strength_weight,
+        champion_prob=champion_probs.get(match.team_a_id),
+        champion_weight=params.champion_strength_weight,
+        champion_field_size=params.champion_field_size,
+    )
+    rating_b = fuse_strength(
+        rating_b,
+        _latest_fifa_rank(db, match.team_b_id, 50),
+        fifa_weight=params.fifa_strength_weight,
+        champion_prob=champion_probs.get(match.team_b_id),
+        champion_weight=params.champion_strength_weight,
+        champion_field_size=params.champion_field_size,
+    )
+    market, _, has_external_market = _market_consensus(db, match.id)
+    host_a, host_b = venue_home_flags(team_a.country_code, team_b.country_code, match.host_country)
     ctx = context or {}
+    blend_alpha = params.market_blend_alpha if has_external_market else 0.0
     forecast = build_forecast(
         rating_a,
         rating_b,
         market,
         host_a,
         host_b,
-        fifa_z_a=(50 - _latest_fifa_rank(db, match.team_a_id, 50)) / 15,
-        fifa_z_b=(50 - _latest_fifa_rank(db, match.team_b_id, 50)) / 15,
         rest_a=ctx.get("rest_a", 0.0),
         rest_b=ctx.get("rest_b", 0.0),
         travel_a=ctx.get("travel_a", 0.0),
@@ -101,6 +123,7 @@ def _build_forecast_matrix(
         beta_travel=params.beta_travel,
         travel_ref=params.travel_ref_km,
         goal_dispersion=params.goal_dispersion,
+        market_blend_alpha=blend_alpha,
     )
     return forecast.lambda_a, forecast.lambda_b, forecast.score_matrix
 
@@ -129,6 +152,7 @@ def build_input_snapshot(db: Session) -> tuple[dict, str]:
     teams: dict[str, dict] = {}
     base_elos = baseline_elos(db, tournament.id)
     live_elos = current_tournament_elos(db, tournament.id)
+    champion_probs = champion_probs_by_team_id(db)
     fifa_by_id: dict[int, str] = {}
     for team, membership in team_rows:
         ratings = db.scalars(select(TeamRating).where(TeamRating.team_id == team.id).order_by(TeamRating.effective_at.desc())).all()
@@ -148,6 +172,7 @@ def build_input_snapshot(db: Session) -> tuple[dict, str]:
             "group_id": membership.group_id,
             "base_camp": [camp.lat, camp.lon],
             "elo_sigma": elo_sigma(team.confederation),
+            "champion_prob": champion_probs.get(team.id),
         }
 
     raw_group_matches: dict[str, list[dict[str, Any]]] = {}
@@ -465,13 +490,30 @@ def _play_knockout(
         round(rest_a, 2), round(rest_b, 2), round(travel_a), round(travel_b),
     )
     if key not in cache:
-        cache[key] = build_forecast(
+        fifa_w = float(params.get("fifa_strength_weight", DEFAULT_CONTEXT_PARAMS.fifa_strength_weight))
+        champ_w = float(params.get("champion_strength_weight", DEFAULT_CONTEXT_PARAMS.champion_strength_weight))
+        field_size = int(params.get("champion_field_size", DEFAULT_CONTEXT_PARAMS.champion_field_size))
+        strength_a = fuse_strength(
             elos[team_a],
+            a["ranks"][0],
+            fifa_weight=fifa_w,
+            champion_prob=a.get("champion_prob"),
+            champion_weight=champ_w,
+            champion_field_size=field_size,
+        )
+        strength_b = fuse_strength(
             elos[team_b],
+            b["ranks"][0],
+            fifa_weight=fifa_w,
+            champion_prob=b.get("champion_prob"),
+            champion_weight=champ_w,
+            champion_field_size=field_size,
+        )
+        cache[key] = build_forecast(
+            strength_a,
+            strength_b,
             host_a=host_a,
             host_b=host_b,
-            fifa_z_a=(50 - a["ranks"][0]) / 15,
-            fifa_z_b=(50 - b["ranks"][0]) / 15,
             rest_a=rest_a,
             rest_b=rest_b,
             travel_a=travel_a,
@@ -480,6 +522,7 @@ def _play_knockout(
             rest_cap=float(params["rest_cap_days"]),
             beta_travel=float(params["beta_travel"]),
             travel_ref=float(params["travel_ref_km"]),
-            goal_dispersion=float(params["goal_dispersion"]),
+            goal_dispersion=float(params.get("goal_dispersion", DEFAULT_CONTEXT_PARAMS.goal_dispersion)),
+            market_blend_alpha=0.0,
         )
     return knockout_winner(team_a, team_b, cache[key], rng)

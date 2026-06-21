@@ -380,14 +380,19 @@ def _rank_lookup() -> dict[str, int]:
 
 
 def _model_decimal_odds(team_a: str, team_b: str, host_country_code: str) -> tuple[float, float, float]:
+    from world_cup_api.domain.team_strength import fuse_strength
+    from world_cup_api.modeling.context_params import DEFAULT_CONTEXT_PARAMS
+
     ranks = _rank_lookup()
     host_a, host_b = host_team_flags(team_a, team_b, host_country_code)
+    w = DEFAULT_CONTEXT_PARAMS.fifa_strength_weight
+    strength_a = fuse_strength(ELO[team_a], ranks[team_a], fifa_weight=w)
+    strength_b = fuse_strength(ELO[team_b], ranks[team_b], fifa_weight=w)
     forecast = build_forecast(
-        ELO[team_a], ELO[team_b],
-        fifa_z_a=(50 - ranks[team_a]) / 15,
-        fifa_z_b=(50 - ranks[team_b]) / 15,
+        strength_a, strength_b,
         host_a=host_a,
         host_b=host_b,
+        market_blend_alpha=0.0,
     )
     margin = 1.06
     return tuple(margin / max(probability, 0.02) for probability in forecast.final)
@@ -461,15 +466,19 @@ def write_prediction_markets() -> None:
             )
             source = "polymarket"
         else:
+            from world_cup_api.domain.team_strength import fuse_strength
+            from world_cup_api.modeling.context_params import DEFAULT_CONTEXT_PARAMS
+
             host = host_country(city)
             host_a, host_b = host_team_flags(team_a, team_b, host)
             ranks = _rank_lookup()
+            w = DEFAULT_CONTEXT_PARAMS.fifa_strength_weight
             probabilities = build_forecast(
-                ELO[team_a], ELO[team_b],
-                fifa_z_a=(50 - ranks[team_a]) / 15,
-                fifa_z_b=(50 - ranks[team_b]) / 15,
+                fuse_strength(ELO[team_a], ranks[team_a], fifa_weight=w),
+                fuse_strength(ELO[team_b], ranks[team_b], fifa_weight=w),
                 host_a=host_a,
                 host_b=host_b,
+                market_blend_alpha=0.0,
             ).final
             source = "kalshi-model-bridge"
 

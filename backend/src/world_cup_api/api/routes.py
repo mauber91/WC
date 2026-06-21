@@ -16,6 +16,7 @@ from world_cup_api.db.session import get_db
 from world_cup_api.jobs.scheduler import schedule_simulation
 from world_cup_api.services.predictions import forecast_match
 from world_cup_api.services.results import remove_current_result, revise_result
+from world_cup_api.services.champion_market_sync import sync_wc_champion_markets
 from world_cup_api.services.market_sync import sync_upcoming_markets
 from world_cup_api.services.tournament_refresh import refresh_tournament_data
 from world_cup_api.services.simulations import create_simulation
@@ -119,14 +120,14 @@ def match_detail(match_id: int, db: Session = Depends(get_db)) -> dict:
 @router.get("/matches/{match_id}/prediction")
 def match_prediction(match_id: int, db: Session = Depends(get_db)) -> dict:
     try:
-        match, forecast, sources = forecast_match(db, match_id)
+        match, forecast, sources, has_external_market = forecast_match(db, match_id)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
-    return {"match_id": match.id, "generated_at": datetime.now(timezone.utc), "model_version": "poisson-elo-fifa-market-v1",
+    return {"match_id": match.id, "generated_at": datetime.now(timezone.utc), "model_version": "nbinom-fused-strength-v1",
             "lambda_a": forecast.lambda_a, "lambda_b": forecast.lambda_b,
             "market": _triple(forecast.market), "model": _triple(forecast.model), "final": _triple(forecast.final),
             "score_distribution": forecast.score_matrix, "market_sources": sources,
-            "data_quality": "complete" if sources else "model_only"}
+            "data_quality": "market_blend" if has_external_market else "model_only"}
 
 
 @router.get("/matches/{match_id}/odds")
@@ -214,12 +215,25 @@ def sync_squads(db: Session = Depends(get_db), refresh_ea_cache: bool = False, s
 
 
 @router.post("/admin/markets/sync", dependencies=[Depends(require_admin)])
-def sync_markets(db: Session = Depends(get_db), match_number: int | None = None) -> list[dict]:
+def sync_markets(db: Session = Depends(get_db), match_number: int | None = None) -> dict:
     numbers = [match_number] if match_number is not None else None
     reports = sync_upcoming_markets(db, match_numbers=numbers)
-    return [{"match_id": report.match_id, "match_number": report.match_number, "queries": list(report.queries),
+    champion_report = sync_wc_champion_markets(db)
+    return {
+        "fixtures": [
+            {"match_id": report.match_id, "match_number": report.match_number, "queries": list(report.queries),
              "attena_hits": report.attena_hits, "stored_rows": report.stored_rows, "platforms": list(report.platforms),
-             "warnings": list(report.warnings)} for report in reports]
+             "warnings": list(report.warnings)}
+            for report in reports
+        ],
+        "wc_winner": {
+            "teams_matched": champion_report.teams_matched,
+            "stored_rows": champion_report.stored_rows,
+            "platforms": list(champion_report.platforms),
+            "top_favorites": [{"fifa_code": code, "probability": prob} for code, prob in champion_report.top_favorites],
+            "warnings": list(champion_report.warnings),
+        },
+    }
 
 
 @router.post("/admin/tournament/refresh", dependencies=[Depends(require_admin)])

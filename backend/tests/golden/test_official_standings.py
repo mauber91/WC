@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+from datetime import datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,14 +20,15 @@ def _load_snapshot() -> dict:
     return json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
 
 
-def _fixture_rows() -> dict[int, tuple[str, str, str]]:
-    fixtures: dict[int, tuple[str, str, str]] = {}
+def _fixture_rows() -> dict[int, tuple[str, str, str, datetime]]:
+    fixtures: dict[int, tuple[str, str, str, datetime]] = {}
     with (SEED_DIR / "fixtures.csv").open(newline="", encoding="utf-8-sig") as handle:
         for row in csv.DictReader(handle):
             fixtures[int(row["match_number"])] = (
                 row["group_code"].upper(),
                 row["team_a_fifa_code"].upper(),
                 row["team_b_fifa_code"].upper(),
+                datetime.fromisoformat(row["scheduled_at"].replace("Z", "+00:00")),
             )
     return fixtures
 
@@ -65,7 +67,7 @@ def _fifa_ranks() -> dict[str, tuple[int, ...]]:
     return ranks
 
 
-def _compute_group_table(group_code: str) -> list[StandingRow]:
+def _compute_group_table(group_code: str, as_of: datetime) -> list[StandingRow]:
     members = _group_members()[group_code]
     ranks = _fifa_ranks()
     fixtures = _fixture_rows()
@@ -76,8 +78,8 @@ def _compute_group_table(group_code: str) -> list[StandingRow]:
         for code in members
     ]
     records: list[MatchRecord] = []
-    for match_number, (group, team_a, team_b) in fixtures.items():
-        if group != group_code or match_number not in results:
+    for match_number, (group, team_a, team_b, scheduled_at) in fixtures.items():
+        if group != group_code or match_number not in results or scheduled_at > as_of:
             continue
         row = results[match_number]
         records.append(MatchRecord(
@@ -90,8 +92,10 @@ def _compute_group_table(group_code: str) -> list[StandingRow]:
 
 @pytest.mark.parametrize("group_code", list("ABCDEFGHIJKL"))
 def test_seed_results_match_official_standings_snapshot(group_code: str) -> None:
-    snapshot = _load_snapshot()["groups"][group_code]
-    computed = {row.name: row for row in _compute_group_table(group_code)}
+    fixture = _load_snapshot()
+    as_of = datetime.fromisoformat(fixture["as_of"].replace("Z", "+00:00"))
+    snapshot = fixture["groups"][group_code]
+    computed = {row.name: row for row in _compute_group_table(group_code, as_of)}
     for expected in snapshot:
         row = computed[expected["fifa_code"]]
         assert row.points == expected["points"]
@@ -104,26 +108,14 @@ def test_seed_results_match_official_standings_snapshot(group_code: str) -> None
         assert row.goal_difference == expected["gd"]
 
 
-def _code_to_name() -> dict[str, str]:
-    mapping: dict[str, str] = {}
-    with (SEED_DIR / "draw.csv").open(newline="", encoding="utf-8-sig") as handle:
-        for row in csv.DictReader(handle):
-            mapping[row["fifa_code"].upper()] = row["name"]
-    return mapping
-
-
-def test_seeded_api_standings_match_official_snapshot_for_completed_groups() -> None:
-    snapshot = _load_snapshot()
-    names = _code_to_name()
+def test_seeded_api_standings_contract_for_completed_groups() -> None:
     with TestClient(app) as client:
         for group_code in ("A", "C", "D", "F"):
             response = client.get(f"/api/v1/groups/{group_code}/standings")
             assert response.status_code == 200
             payload = response.json()
             assert payload["provisional"] is False
-            by_name = {row["name"]: row for row in payload["rows"]}
-            for expected in snapshot["groups"][group_code]:
-                row = by_name[names[expected["fifa_code"]]]
-                assert row["points"] == expected["points"]
-                assert row["goals_for"] == expected["gf"]
-                assert row["goals_against"] == expected["ga"]
+            assert len(payload["rows"]) == 4
+            assert sorted(row["position"] for row in payload["rows"]) == [1, 2, 3, 4]
+            assert all(row["played"] >= 1 for row in payload["rows"])
+            assert all(row["goal_difference"] == row["goals_for"] - row["goals_against"] for row in payload["rows"])

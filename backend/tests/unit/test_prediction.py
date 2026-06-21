@@ -49,12 +49,14 @@ def test_build_forecast_with_dispersion_still_normalizes() -> None:
     assert one_x_two(matrix) == pytest.approx(forecast.final, abs=1e-10)
 
 
-def test_m52_seed_elos_favor_bosnia_over_qatar() -> None:
-    """Seed Elo gap should make Bosnia favorites vs Qatar before group form."""
+def test_m52_fused_strength_favors_bosnia() -> None:
+    from world_cup_api.domain.team_strength import fuse_strength
+    from world_cup_api.modeling.context_params import DEFAULT_CONTEXT_PARAMS
+
+    w = DEFAULT_CONTEXT_PARAMS.fifa_strength_weight
     forecast = build_forecast(
-        1596,
-        1437,
-        fifa_z_a=(50 - 64) / 15,
-        fifa_z_b=(50 - 56) / 15,
+        fuse_strength(1596, 64, fifa_weight=w),
+        fuse_strength(1437, 56, fifa_weight=w),
+        market_blend_alpha=0.0,
     )
     assert forecast.model[0] > forecast.model[2]

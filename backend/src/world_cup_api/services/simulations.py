@@ -28,7 +28,7 @@ def create_simulation(db: Session, iterations: int, seed: int, force: bool = Fal
     run = Simulation(id=str(uuid.uuid4()), tournament_id=tournament.id, status="queued", iterations=iterations,
                      progress_iterations=0, seed=seed, input_cutoff_at=datetime.fromisoformat(snapshot["cutoff"]),
                      input_hash=input_hash, input_snapshot_json=snapshot, ruleset_version=tournament.ruleset_version,
-                     model_version="nbinom-elo-fifa-market-v1", engine_version="engine-v3")
+                     model_version="nbinom-fused-strength-v1", engine_version="engine-v3")
     db.add(run)
     db.commit()
     db.refresh(run)

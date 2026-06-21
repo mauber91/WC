@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { NavLink, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, percent } from './api/client'
 import { BracketBoard, type BracketRow } from './components/BracketBoard'
 import { TeamPageView } from './components/TeamPage'
+import { ManualScenarioPage } from './features/manualScenario/ManualScenarioPage'
+import { flagEmoji } from './lib/flags'
 import { teamPath } from './lib/teamSlug'
 import './App.css'
 
@@ -19,16 +21,41 @@ type Triple = { team_a: number; draw: number; team_b: number }
 type MatchPrediction = { data_quality: string; lambda_a: number; lambda_b: number; final: Triple; model: Triple; market: Triple | null; score_distribution: number[][] }
 type ImportPreview = { id: string; record_count: number; status: string; errors: { row: number; message: string }[] }
 
-const nav = [
-  ['/groups/A', 'Groups'], ['/matches', 'Matches'], ['/simulator', 'Simulator'],
-  ['/bracket', 'Bracket'], ['/teams', 'Teams'], ['/admin/data', 'Admin'],
+const nav: { to: string; label: string; activePrefix?: string }[] = [
+  { to: '/groups/A', label: 'Groups', activePrefix: '/groups' },
+  { to: '/matches', label: 'Matches', activePrefix: '/matches' },
+  { to: '/simulator', label: 'Simulator', activePrefix: '/simulator' },
+  { to: '/scenario', label: 'Scenario', activePrefix: '/scenario' },
+  { to: '/bracket', label: 'Bracket', activePrefix: '/bracket' },
+  { to: '/teams', label: 'Teams', activePrefix: '/teams' },
+  { to: '/admin/data', label: 'Admin', activePrefix: '/admin' },
 ]
+
+function SidebarNav() {
+  const location = useLocation()
+  return (
+    <nav>
+      {nav.map(({ to, label, activePrefix }) => {
+        const active = activePrefix ? location.pathname.startsWith(activePrefix) : undefined
+        return (
+          <NavLink
+            key={to}
+            to={to}
+            className={activePrefix ? (active ? 'active' : '') : ({ isActive }) => isActive ? 'active' : ''}
+          >
+            {label}
+          </NavLink>
+        )
+      })}
+    </nav>
+  )
+}
 
 function App() {
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">26</span><div><strong>Forecast</strong><small>World Cup intelligence</small></div></div>
-      <nav>{nav.map(([to, label]) => <NavLink key={to} to={to} className={({ isActive }) => isActive ? 'active' : ''}>{label}</NavLink>)}</nav>
+      <SidebarNav />
       <SidebarSimulationStatus />
       <div className="sidebar-note"><span className="live-dot" /> Local data workspace<small>Probabilities, not promises.</small></div>
     </aside>
@@ -38,6 +65,7 @@ function App() {
       <Route path="/matches" element={<MatchesPage />} />
       <Route path="/matches/:id" element={<MatchPage />} />
       <Route path="/simulator" element={<SimulatorPage />} />
+      <Route path="/scenario" element={<ManualScenarioPage />} />
       <Route path="/bracket" element={<BracketPage />} />
       <Route path="/teams" element={<TeamsPage />} />
       <Route path="/teams/:slug" element={<TeamPage />} />
@@ -64,7 +92,11 @@ function GroupPage() {
   }, [groups.data])
   return <>
     <PageHeader eyebrow="Live group state" title={`Group ${code}`} detail="Official results stay fixed. Every remaining fixture is modeled across the full tournament state." actions={<Freshness provisional={standings.data?.provisional} />} />
-    <div className="group-tabs">{groups.data?.map(group => <NavLink key={group.code} to={`/groups/${group.code}`}>{group.code}</NavLink>)}</div>
+    <div className="group-tabs">{groups.data?.map(group => (
+      <NavLink key={group.code} to={`/groups/${group.code}`} className={({ isActive }) => isActive ? 'active' : ''}>
+        {group.code}
+      </NavLink>
+    ))}</div>
     {standings.data?.warnings.map(warning => <div className="warning" key={warning}>{warning}</div>)}
     <section className="card"><div className="card-head"><div><span className="eyebrow">Current table</span><h2>What has happened</h2></div><span className="meta">As of {standings.data ? new Date(standings.data.as_of).toLocaleString() : '—'}</span></div>
       {standings.isLoading ? <Loading /> : <table className="standings"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>{standings.data?.rows.map(row => <tr key={row.team_id}><td><span className={`rank rank-${row.position}`}>{row.position}</span></td><td className="team-name"><NavLink className="team-link" to={teamPath({ name: row.name })}>{row.name}</NavLink></td><td>{row.played}</td><td>{row.won}</td><td>{row.drawn}</td><td>{row.lost}</td><td>{row.goal_difference > 0 ? '+' : ''}{row.goal_difference}</td><td><strong>{row.points}</strong></td></tr>)}</tbody></table>}
@@ -81,8 +113,75 @@ function GroupPage() {
 function MatchesPage() {
   const navigate = useNavigate()
   const matches = useQuery<Match[]>({ queryKey: ['matches'], queryFn: () => api('/matches') })
-  return <><PageHeader eyebrow="Fixture model" title="Match predictions" detail="Compare the independent Poisson model with devigged market consensus and the final calibrated blend." />
-    <section className="card match-list">{matches.data?.map(match => <button key={match.id} onClick={() => navigate(`/matches/${match.id}`)}><span className="match-no">M{match.official_match_number} · Group {match.group_code}</span><strong>{match.team_a.name}<em>vs</em>{match.team_b.name}</strong><span>{match.result ? `${match.result.team_a_goals}–${match.result.team_b_goals}` : new Date(match.scheduled_at).toLocaleDateString()}</span></button>)}</section></>
+  const predictions = useQueries({
+    queries: (matches.data ?? []).map(match => ({
+      queryKey: ['match-prediction', match.id],
+      queryFn: () => api<MatchPrediction>(`/matches/${match.id}/prediction`),
+      enabled: !!matches.data,
+    })),
+  })
+  const predictionByMatchId = useMemo(
+    () => new Map((matches.data ?? []).map((match, index) => [match.id, predictions[index]?.data])),
+    [matches.data, predictions],
+  )
+
+  return <>
+    <PageHeader eyebrow="Fixture model" title="Match predictions" detail="Compare the independent Poisson model with devigged market consensus and the final calibrated blend." />
+    <section className="card match-list">
+      {matches.data?.map(match => {
+        const prediction = predictionByMatchId.get(match.id)
+        const hasResult = !!match.result
+        return (
+          <button key={match.id} type="button" className="match-list-card" onClick={() => navigate(`/matches/${match.id}`)}>
+            <span className="match-no">M{match.official_match_number} · Group {match.group_code}</span>
+            <div className="match-list-body">
+              <div className="match-list-teams">
+                <span className="match-team">
+                  <span className="match-list-flag" aria-hidden>{flagEmoji(match.team_a.fifa_code)}</span>
+                  {match.team_a.name}
+                </span>
+                <div className="match-list-center">
+                  {hasResult ? (
+                    <span className="match-score">{match.result!.team_a_goals}–{match.result!.team_b_goals}</span>
+                  ) : (
+                    <>
+                      <span className="match-vs">vs</span>
+                      <span className="match-date">{new Date(match.scheduled_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                    </>
+                  )}
+                </div>
+                <span className="match-team match-team-away">
+                  <span className="match-list-flag" aria-hidden>{flagEmoji(match.team_b.fifa_code)}</span>
+                  {match.team_b.name}
+                </span>
+              </div>
+              <div className="match-outcomes">
+                <span className="match-outcomes-label">Model</span>
+                {prediction ? (
+                  <div className="match-outcome-cols">
+                    <span>
+                      <strong>{percent(prediction.final.team_a)}</strong>
+                      <small>{match.team_a.fifa_code}</small>
+                    </span>
+                    <span>
+                      <strong>{percent(prediction.final.draw)}</strong>
+                      <small>Draw</small>
+                    </span>
+                    <span>
+                      <strong>{percent(prediction.final.team_b)}</strong>
+                      <small>{match.team_b.fifa_code}</small>
+                    </span>
+                  </div>
+                ) : (
+                  <strong className="match-outcomes-empty">—</strong>
+                )}
+              </div>
+            </div>
+          </button>
+        )
+      })}
+    </section>
+  </>
 }
 
 function MatchPage() {

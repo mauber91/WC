@@ -1,6 +1,9 @@
+import csv
+
 from fastapi.testclient import TestClient
 import pytest
 
+from world_cup_api.config import ROOT_DIR
 from world_cup_api.main import app
 
 
@@ -46,17 +49,38 @@ def test_prediction_contract() -> None:
         assert sum(response.json()["final"].values()) == pytest.approx(1.0)
 
 
+def _seeded_upcoming_market_fixture() -> tuple[int, set[str], set[str]]:
+    seed_dir = ROOT_DIR / "data" / "seed"
+    with (seed_dir / "results.csv").open(newline="", encoding="utf-8-sig") as handle:
+        completed = {int(row["match_number"]) for row in csv.DictReader(handle)}
+    bookmakers: dict[int, set[str]] = {}
+    with (seed_dir / "bookmaker_odds.csv").open(newline="", encoding="utf-8-sig") as handle:
+        for row in csv.DictReader(handle):
+            bookmakers.setdefault(int(row["match_number"]), set()).add(row["bookmaker"])
+    platforms: dict[int, set[str]] = {}
+    with (seed_dir / "prediction_markets.csv").open(newline="", encoding="utf-8-sig") as handle:
+        for row in csv.DictReader(handle):
+            platforms.setdefault(int(row["match_number"]), set()).add(row["platform"])
+    match_number = min((set(bookmakers) & set(platforms)) - completed)
+    return match_number, bookmakers[match_number], platforms[match_number]
+
+
 def test_upcoming_match_uses_seeded_market_odds() -> None:
+    match_number, expected_bookmakers, expected_platforms = _seeded_upcoming_market_fixture()
     with TestClient(app) as client:
         matches = client.get("/api/v1/matches").json()
-        germany_ivory = next(
-            row for row in matches if row["official_match_number"] == 33 and row["result"] is None
+        upcoming = next(
+            row for row in matches if row["official_match_number"] == match_number and row["result"] is None
         )
-        response = client.get(f"/api/v1/matches/{germany_ivory['id']}/prediction")
+        response = client.get(f"/api/v1/matches/{upcoming['id']}/prediction")
         assert response.status_code == 200
         payload = response.json()
         assert payload["market"] is not None
-        assert payload["data_quality"] == "complete"
+        assert payload["data_quality"] == "market_blend"
         assert len(payload["market_sources"]) >= 2
-        assert any(source.get("bookmaker") == "888sport" for source in payload["market_sources"])
-        assert any(source.get("platform") == "polymarket" for source in payload["market_sources"])
+        assert expected_bookmakers <= {
+            source["bookmaker"] for source in payload["market_sources"] if source.get("bookmaker")
+        }
+        assert expected_platforms <= {
+            source["platform"] for source in payload["market_sources"] if source.get("platform")
+        }

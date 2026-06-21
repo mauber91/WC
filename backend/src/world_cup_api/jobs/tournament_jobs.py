@@ -8,6 +8,7 @@ from apscheduler.jobstores.base import JobLookupError
 from world_cup_api.config import get_settings
 from world_cup_api.db.session import SessionLocal
 from world_cup_api.jobs.scheduler import scheduler, shutdown_scheduler
+from world_cup_api.services.champion_market_sync import sync_wc_champion_markets
 from world_cup_api.services.market_sync import sync_upcoming_markets
 from world_cup_api.services.tournament_refresh import refresh_tournament_data
 
@@ -46,6 +47,7 @@ def run_market_sync_job() -> None:
     with SessionLocal() as db:
         try:
             reports = sync_upcoming_markets(db)
+            champion_report = sync_wc_champion_markets(db)
         except Exception:
             logger.exception("Scheduled market sync failed")
             return
@@ -55,6 +57,15 @@ def run_market_sync_job() -> None:
         logger.info("Market sync stored %s rows across %s fixtures (%s)", stored, len(reports), ", ".join(platforms))
     else:
         logger.info("Market sync completed with no new rows for %s fixtures", len(reports))
+    if champion_report.stored_rows:
+        logger.info(
+            "WC champion market sync stored %s rows for %s teams (%s)",
+            champion_report.stored_rows,
+            champion_report.teams_matched,
+            ", ".join(champion_report.platforms),
+        )
+    elif champion_report.warnings:
+        logger.warning("WC champion market sync warnings: %s", "; ".join(champion_report.warnings))
 
 
 def _schedule_immediate(job_id: str, func, *, delay_seconds: int = 0) -> None:

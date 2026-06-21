@@ -51,6 +51,8 @@ export type SquadPlayer = {
   lengthy_injuries: Array<{ started_on: string; ended_on: string | null; days_out: number }>
 }
 
+const SHOW_SQUAD = false
+
 export type TeamFixture = {
   id: number
   official_match_number: number
@@ -207,7 +209,7 @@ export function TeamPageView({ slug, latestSimulationId }: { slug: string; lates
       <PageHeader
         eyebrow={[team.data?.fifa_code, team.data?.group_code ? `Group ${team.data.group_code}` : null, team.data?.is_host ? 'Host' : null].filter(Boolean).join(' · ') || 'Team'}
         title={team.data?.name ?? 'Team detail'}
-        detail="Ratings, squad profile, live group standing, fixture outlook, and full simulation probabilities."
+        detail="Live group standing, fixture outlook, and full simulation probabilities."
         actions={<NavLink className="button ghost" to="/teams">All teams</NavLink>}
       />
 
@@ -237,7 +239,7 @@ export function TeamPageView({ slug, latestSimulationId }: { slug: string; lates
         </section>
       )}
 
-      {team.data && team.data.squad.length > 0 && (
+      {SHOW_SQUAD && team.data && team.data.squad.length > 0 && (
         <section className="card">
           <div className="card-head">
             <div>

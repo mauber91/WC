@@ -22,9 +22,9 @@ class KalshiMarketQuote:
     volume: float | None
 
 
-def fetch_event_markets(event_ticker: str) -> list[KalshiMarketQuote]:
+def fetch_event_markets(event_ticker: str, *, limit: int = 100) -> list[KalshiMarketQuote]:
     settings = get_settings()
-    params = urlencode({"event_ticker": event_ticker, "limit": 20})
+    params = urlencode({"event_ticker": event_ticker, "limit": limit})
     url = f"{settings.kalshi_api_base.rstrip('/')}/markets?{params}"
     request = Request(url, headers={"Accept": "application/json", "User-Agent": "world-cup-forecast/0.1"})
     try:

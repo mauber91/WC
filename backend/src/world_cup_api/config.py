@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     simulation_max_workers: int = 4
     attena_api_base: str = "https://attena-api.fly.dev/api/search/"
     kalshi_api_base: str = "https://api.elections.kalshi.com/trade-api/v2"
+    polymarket_gamma_api_base: str = "https://gamma-api.polymarket.com"
+    kalshi_wc_winner_event: str = "KXMENWORLDCUP-26"
     market_sync_enabled: bool = True
     market_sync_on_startup: bool = True
     seed_refresh_enabled: bool = True
