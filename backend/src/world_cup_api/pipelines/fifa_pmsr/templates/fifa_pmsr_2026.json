@@ -1,0 +1,27 @@
+{
+  "key": "fifa_pmsr_2026",
+  "version": "2026.1",
+  "page_size": [960.0, 540.0],
+  "page_size_tolerance": 2.0,
+  "required_anchors": [
+    "POST MATCH SUMMARY REPORT",
+    "Match Summary - Teams",
+    "Match Summary - Key Statistics",
+    "Passing Networks",
+    "Physical Data"
+  ],
+  "expected_page_count": 52,
+  "pitch_regions": {
+    "line_height": [85, 125, 875, 490],
+    "line_breaks_summary": [65, 140, 610, 485],
+    "attempts_map": [50, 120, 620, 495],
+    "crosses": [45, 125, 620, 500],
+    "offers_to_receive": [45, 120, 620, 500],
+    "movement_to_receive": [45, 145, 570, 500],
+    "defensive_actions": [45, 135, 610, 500],
+    "defensive_line_height": [85, 125, 875, 490],
+    "defensive_pressure": [45, 180, 915, 500],
+    "goalkeeper_distribution": [45, 135, 610, 500],
+    "goal_prevention": [45, 145, 610, 500]
+  }
+}

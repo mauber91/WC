@@ -1,0 +1,558 @@
+{
+  "as_of": "2026-06-20T12:00:00Z",
+  "source": "https://www.sportingnews.com/in/football/news/world-cup-2026-standings-table-live-updated-groups/8c2619077197f0ec1b77d9fb",
+  "groups": {
+    "A": [
+      {
+        "fifa_code": "MEX",
+        "points": 6,
+        "played": 2,
+        "won": 2,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 3,
+        "ga": 0,
+        "gd": 3
+      },
+      {
+        "fifa_code": "KOR",
+        "points": 3,
+        "played": 2,
+        "won": 1,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 2,
+        "ga": 2,
+        "gd": 0
+      },
+      {
+        "fifa_code": "CZE",
+        "points": 1,
+        "played": 2,
+        "won": 0,
+        "drawn": 1,
+        "lost": 1,
+        "gf": 2,
+        "ga": 3,
+        "gd": -1
+      },
+      {
+        "fifa_code": "RSA",
+        "points": 1,
+        "played": 2,
+        "won": 0,
+        "drawn": 1,
+        "lost": 1,
+        "gf": 1,
+        "ga": 3,
+        "gd": -2
+      }
+    ],
+    "B": [
+      {
+        "fifa_code": "CAN",
+        "points": 4,
+        "played": 2,
+        "won": 1,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 7,
+        "ga": 1,
+        "gd": 6
+      },
+      {
+        "fifa_code": "SUI",
+        "points": 4,
+        "played": 2,
+        "won": 1,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 5,
+        "ga": 2,
+        "gd": 3
+      },
+      {
+        "fifa_code": "BIH",
+        "points": 1,
+        "played": 2,
+        "won": 0,
+        "drawn": 1,
+        "lost": 1,
+        "gf": 2,
+        "ga": 5,
+        "gd": -3
+      },
+      {
+        "fifa_code": "QAT",
+        "points": 1,
+        "played": 2,
+        "won": 0,
+        "drawn": 1,
+        "lost": 1,
+        "gf": 1,
+        "ga": 7,
+        "gd": -6
+      }
+    ],
+    "C": [
+      {
+        "fifa_code": "BRA",
+        "points": 4,
+        "played": 2,
+        "won": 1,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 4,
+        "ga": 1,
+        "gd": 3
+      },
+      {
+        "fifa_code": "MAR",
+        "points": 4,
+        "played": 2,
+        "won": 1,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 2,
+        "ga": 1,
+        "gd": 1
+      },
+      {
+        "fifa_code": "SCO",
+        "points": 3,
+        "played": 2,
+        "won": 1,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 1,
+        "ga": 1,
+        "gd": 0
+      },
+      {
+        "fifa_code": "HAI",
+        "points": 0,
+        "played": 2,
+        "won": 0,
+        "drawn": 0,
+        "lost": 2,
+        "gf": 0,
+        "ga": 4,
+        "gd": -4
+      }
+    ],
+    "D": [
+      {
+        "fifa_code": "USA",
+        "points": 6,
+        "played": 2,
+        "won": 2,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 6,
+        "ga": 1,
+        "gd": 5
+      },
+      {
+        "fifa_code": "AUS",
+        "points": 3,
+        "played": 2,
+        "won": 1,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 2,
+        "ga": 2,
+        "gd": 0
+      },
+      {
+        "fifa_code": "PAR",
+        "points": 3,
+        "played": 2,
+        "won": 1,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 2,
+        "ga": 4,
+        "gd": -2
+      },
+      {
+        "fifa_code": "TUR",
+        "points": 0,
+        "played": 2,
+        "won": 0,
+        "drawn": 0,
+        "lost": 2,
+        "gf": 0,
+        "ga": 3,
+        "gd": -3
+      }
+    ],
+    "E": [
+      {
+        "fifa_code": "GER",
+        "points": 3,
+        "played": 1,
+        "won": 1,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 7,
+        "ga": 1,
+        "gd": 6
+      },
+      {
+        "fifa_code": "CIV",
+        "points": 3,
+        "played": 1,
+        "won": 1,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 1,
+        "ga": 0,
+        "gd": 1
+      },
+      {
+        "fifa_code": "ECU",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 0,
+        "ga": 1,
+        "gd": -1
+      },
+      {
+        "fifa_code": "CUW",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 1,
+        "ga": 7,
+        "gd": -6
+      }
+    ],
+    "F": [
+      {
+        "fifa_code": "NED",
+        "points": 4,
+        "played": 2,
+        "won": 1,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 7,
+        "ga": 3,
+        "gd": 4
+      },
+      {
+        "fifa_code": "SWE",
+        "points": 3,
+        "played": 2,
+        "won": 1,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 6,
+        "ga": 6,
+        "gd": 0
+      },
+      {
+        "fifa_code": "JPN",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 2,
+        "ga": 2,
+        "gd": 0
+      },
+      {
+        "fifa_code": "TUN",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 1,
+        "ga": 5,
+        "gd": -4
+      }
+    ],
+    "G": [
+      {
+        "fifa_code": "IRN",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 2,
+        "ga": 2,
+        "gd": 0
+      },
+      {
+        "fifa_code": "NZL",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 2,
+        "ga": 2,
+        "gd": 0
+      },
+      {
+        "fifa_code": "BEL",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 1,
+        "ga": 1,
+        "gd": 0
+      },
+      {
+        "fifa_code": "EGY",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 1,
+        "ga": 1,
+        "gd": 0
+      }
+    ],
+    "H": [
+      {
+        "fifa_code": "URU",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 1,
+        "ga": 1,
+        "gd": 0
+      },
+      {
+        "fifa_code": "KSA",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 1,
+        "ga": 1,
+        "gd": 0
+      },
+      {
+        "fifa_code": "ESP",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 0,
+        "ga": 0,
+        "gd": 0
+      },
+      {
+        "fifa_code": "CPV",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 0,
+        "ga": 0,
+        "gd": 0
+      }
+    ],
+    "I": [
+      {
+        "fifa_code": "NOR",
+        "points": 3,
+        "played": 1,
+        "won": 1,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 4,
+        "ga": 1,
+        "gd": 3
+      },
+      {
+        "fifa_code": "FRA",
+        "points": 3,
+        "played": 1,
+        "won": 1,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 3,
+        "ga": 1,
+        "gd": 2
+      },
+      {
+        "fifa_code": "SEN",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 1,
+        "ga": 3,
+        "gd": -2
+      },
+      {
+        "fifa_code": "IRQ",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 1,
+        "ga": 4,
+        "gd": -3
+      }
+    ],
+    "J": [
+      {
+        "fifa_code": "ARG",
+        "points": 3,
+        "played": 1,
+        "won": 1,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 3,
+        "ga": 0,
+        "gd": 3
+      },
+      {
+        "fifa_code": "AUT",
+        "points": 3,
+        "played": 1,
+        "won": 1,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 3,
+        "ga": 1,
+        "gd": 2
+      },
+      {
+        "fifa_code": "JOR",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 1,
+        "ga": 3,
+        "gd": -2
+      },
+      {
+        "fifa_code": "ALG",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 0,
+        "ga": 3,
+        "gd": -3
+      }
+    ],
+    "K": [
+      {
+        "fifa_code": "COL",
+        "points": 3,
+        "played": 1,
+        "won": 1,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 3,
+        "ga": 1,
+        "gd": 2
+      },
+      {
+        "fifa_code": "POR",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 1,
+        "ga": 1,
+        "gd": 0
+      },
+      {
+        "fifa_code": "COD",
+        "points": 1,
+        "played": 1,
+        "won": 0,
+        "drawn": 1,
+        "lost": 0,
+        "gf": 1,
+        "ga": 1,
+        "gd": 0
+      },
+      {
+        "fifa_code": "UZB",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 1,
+        "ga": 3,
+        "gd": -2
+      }
+    ],
+    "L": [
+      {
+        "fifa_code": "ENG",
+        "points": 3,
+        "played": 1,
+        "won": 1,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 4,
+        "ga": 2,
+        "gd": 2
+      },
+      {
+        "fifa_code": "GHA",
+        "points": 3,
+        "played": 1,
+        "won": 1,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 1,
+        "ga": 0,
+        "gd": 1
+      },
+      {
+        "fifa_code": "PAN",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 0,
+        "ga": 1,
+        "gd": -1
+      },
+      {
+        "fifa_code": "CRO",
+        "points": 0,
+        "played": 1,
+        "won": 0,
+        "drawn": 0,
+        "lost": 1,
+        "gf": 2,
+        "ga": 4,
+        "gd": -2
+      }
+    ]
+  }
+}

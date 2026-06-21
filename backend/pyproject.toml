@@ -1,0 +1,50 @@
+[project]
+name = "world-cup-api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "mberlanga91", email = "mberlanga91@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.18.4",
+    "apscheduler>=3.11,<4",
+    "fastapi>=0.115,<1",
+    "numpy>=2.4.6",
+    "opencv-python-headless>=4.13.0.92",
+    "orjson>=3.11.9",
+    "pandas>=3.0.3",
+    "pdfplumber>=0.11.10",
+    "pillow>=12.2.0",
+    "pyarrow>=24.0.0",
+    "pydantic-settings>=2,<3",
+    "pypdf>=6.13.3",
+    "pypdfium2>=5.10.1",
+    "pytesseract>=0.3.13",
+    "python-multipart>=0.0.32",
+    "scikit-learn>=1.9.0",
+    "scipy>=1.18.0",
+    "sqlalchemy>=2,<3",
+    "uvicorn[standard]>=0.49.0",
+]
+
+[project.scripts]
+world-cup-api = "world_cup_api:main"
+world-cup-report = "world_cup_api.pipelines.fifa_pmsr.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9.7,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "hypothesis>=6.155.6",
+    "mypy>=2.1.0",
+    "pypdf>=6.13.3",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.18",
+]

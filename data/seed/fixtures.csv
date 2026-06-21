@@ -1,0 +1,73 @@
+match_number,group_code,team_a_fifa_code,team_b_fifa_code,scheduled_at,venue,host_country,status
+1,A,MEX,RSA,2026-06-11T19:00:00Z,Estadio Azteca,MX,final
+2,A,KOR,CZE,2026-06-12T02:00:00Z,Estadio Akron,MX,final
+3,B,CAN,BIH,2026-06-12T19:00:00Z,BMO Field,CA,final
+4,D,USA,PAR,2026-06-13T01:00:00Z,SoFi Stadium,US,final
+5,C,HAI,SCO,2026-06-14T01:00:00Z,Gillette Stadium,US,final
+6,D,AUS,TUR,2026-06-14T04:00:00Z,BC Place,CA,final
+7,C,BRA,MAR,2026-06-13T22:00:00Z,MetLife Stadium,US,final
+8,B,QAT,SUI,2026-06-13T19:00:00Z,Levi's Stadium,US,final
+9,E,CIV,ECU,2026-06-14T23:00:00Z,Lincoln Financial Field,US,final
+10,E,GER,CUW,2026-06-14T17:00:00Z,NRG Stadium,US,final
+11,F,NED,JPN,2026-06-14T20:00:00Z,AT&T Stadium,US,final
+12,F,SWE,TUN,2026-06-15T02:00:00Z,Estadio BBVA,MX,final
+13,H,KSA,URU,2026-06-15T22:00:00Z,Hard Rock Stadium,US,final
+14,H,ESP,CPV,2026-06-15T16:00:00Z,Mercedes-Benz Stadium,US,final
+15,G,IRN,NZL,2026-06-16T01:00:00Z,SoFi Stadium,US,final
+16,G,BEL,EGY,2026-06-15T19:00:00Z,Lumen Field,US,final
+17,I,FRA,SEN,2026-06-16T19:00:00Z,MetLife Stadium,US,final
+18,I,IRQ,NOR,2026-06-16T22:00:00Z,Gillette Stadium,US,final
+19,J,ARG,ALG,2026-06-17T01:00:00Z,Arrowhead Stadium,US,final
+20,J,AUT,JOR,2026-06-17T04:00:00Z,Levi's Stadium,US,final
+21,L,GHA,PAN,2026-06-17T23:00:00Z,BMO Field,CA,final
+22,L,ENG,CRO,2026-06-17T20:00:00Z,AT&T Stadium,US,final
+23,K,POR,COD,2026-06-17T17:00:00Z,NRG Stadium,US,final
+24,K,UZB,COL,2026-06-18T02:00:00Z,Estadio Azteca,MX,final
+25,A,CZE,RSA,2026-06-18T16:00:00Z,Mercedes-Benz Stadium,US,final
+26,B,SUI,BIH,2026-06-18T19:00:00Z,SoFi Stadium,US,final
+27,B,CAN,QAT,2026-06-18T22:00:00Z,BC Place,CA,final
+28,A,MEX,KOR,2026-06-19T01:00:00Z,Estadio Akron,MX,final
+29,C,BRA,HAI,2026-06-20T01:00:00Z,Lincoln Financial Field,US,final
+30,C,SCO,MAR,2026-06-19T22:00:00Z,Gillette Stadium,US,final
+31,D,TUR,PAR,2026-06-20T03:00:00Z,Levi's Stadium,US,final
+32,D,USA,AUS,2026-06-19T19:00:00Z,Lumen Field,US,final
+33,E,GER,CIV,2026-06-20T20:00:00Z,BMO Field,CA,final
+34,E,ECU,CUW,2026-06-21T00:00:00Z,Arrowhead Stadium,US,final
+35,F,NED,SWE,2026-06-20T17:00:00Z,NRG Stadium,US,final
+36,F,TUN,JPN,2026-06-21T04:00:00Z,Estadio BBVA,MX,final
+37,H,URU,CPV,2026-06-21T22:00:00Z,Hard Rock Stadium,US,scheduled
+38,H,ESP,KSA,2026-06-21T16:00:00Z,Mercedes-Benz Stadium,US,scheduled
+39,G,BEL,IRN,2026-06-21T19:00:00Z,SoFi Stadium,US,scheduled
+40,G,NZL,EGY,2026-06-22T01:00:00Z,BC Place,CA,scheduled
+41,I,NOR,SEN,2026-06-23T00:00:00Z,MetLife Stadium,US,scheduled
+42,I,FRA,IRQ,2026-06-22T21:00:00Z,Lincoln Financial Field,US,scheduled
+43,J,ARG,AUT,2026-06-22T17:00:00Z,AT&T Stadium,US,scheduled
+44,J,JOR,ALG,2026-06-23T03:00:00Z,Levi's Stadium,US,scheduled
+45,L,ENG,GHA,2026-06-23T20:00:00Z,Gillette Stadium,US,scheduled
+46,L,PAN,CRO,2026-06-23T23:00:00Z,BMO Field,CA,scheduled
+47,K,POR,UZB,2026-06-23T17:00:00Z,NRG Stadium,US,scheduled
+48,K,COL,COD,2026-06-24T02:00:00Z,Estadio Akron,MX,scheduled
+49,C,SCO,BRA,2026-06-24T22:00:00Z,Hard Rock Stadium,US,scheduled
+50,C,MAR,HAI,2026-06-24T22:00:00Z,Mercedes-Benz Stadium,US,scheduled
+51,B,SUI,CAN,2026-06-24T19:00:00Z,BC Place,CA,scheduled
+52,B,BIH,QAT,2026-06-24T19:00:00Z,Lumen Field,US,scheduled
+53,A,CZE,MEX,2026-06-25T01:00:00Z,Estadio Azteca,MX,scheduled
+54,A,RSA,KOR,2026-06-25T01:00:00Z,Estadio BBVA,MX,scheduled
+55,E,CUW,CIV,2026-06-25T20:00:00Z,Lincoln Financial Field,US,scheduled
+56,E,ECU,GER,2026-06-25T20:00:00Z,MetLife Stadium,US,scheduled
+57,F,JPN,SWE,2026-06-25T23:00:00Z,AT&T Stadium,US,scheduled
+58,F,TUN,NED,2026-06-25T23:00:00Z,Arrowhead Stadium,US,scheduled
+59,D,TUR,USA,2026-06-26T02:00:00Z,SoFi Stadium,US,scheduled
+60,D,PAR,AUS,2026-06-26T02:00:00Z,Levi's Stadium,US,scheduled
+61,I,NOR,FRA,2026-06-26T19:00:00Z,Gillette Stadium,US,scheduled
+62,I,SEN,IRQ,2026-06-26T19:00:00Z,BMO Field,CA,scheduled
+63,G,EGY,IRN,2026-06-27T03:00:00Z,Lumen Field,US,scheduled
+64,G,NZL,BEL,2026-06-27T03:00:00Z,BC Place,CA,scheduled
+65,H,CPV,KSA,2026-06-27T00:00:00Z,NRG Stadium,US,scheduled
+66,H,URU,ESP,2026-06-27T00:00:00Z,Estadio Akron,MX,scheduled
+67,L,PAN,ENG,2026-06-27T21:00:00Z,MetLife Stadium,US,scheduled
+68,L,CRO,GHA,2026-06-27T21:00:00Z,Lincoln Financial Field,US,scheduled
+69,J,ALG,AUT,2026-06-28T02:00:00Z,Arrowhead Stadium,US,scheduled
+70,J,JOR,ARG,2026-06-28T02:00:00Z,AT&T Stadium,US,scheduled
+71,K,COL,POR,2026-06-27T23:30:00Z,Hard Rock Stadium,US,scheduled
+72,K,COD,UZB,2026-06-27T23:30:00Z,Mercedes-Benz Stadium,US,scheduled
