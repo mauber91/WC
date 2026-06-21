@@ -5,7 +5,14 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { api, percent } from './api/client'
 import { BracketBoard, type BracketRow } from './components/BracketBoard'
 import { TeamPageView } from './components/TeamPage'
+import {
+  isPublishedMode,
+  publishedScenario,
+  publishedScenarioDescription,
+  publishedScenarioTitle,
+} from './config/appMode'
 import { ManualScenarioPage } from './features/manualScenario/ManualScenarioPage'
+import { useLatestSimulation, useRuns, type SimulationRun } from './hooks/useLatestSimulation'
 import { flagEmoji } from './lib/flags'
 import { teamPath } from './lib/teamSlug'
 import './App.css'
@@ -14,14 +21,23 @@ type Team = { id: number; slug: string; fifa_code: string; name: string; country
 type Group = { id: number; code: string; display_name: string; teams: Team[] }
 type Standing = { position: number; team_id: number; name: string; played: number; won: number; drawn: number; lost: number; goals_for: number; goals_against: number; goal_difference: number; points: number }
 type Match = { id: number; official_match_number: number; group_code: string; team_a: Team; team_b: Team; scheduled_at: string; status: string; result?: { team_a_goals: number; team_b_goals: number; revision: number } }
-type Run = { id: string; status: string; iterations: number; progress_iterations: number; seed: number; input_cutoff_at: string; model_version: string; ruleset_version: string; duration_ms?: number; error_message?: string }
+type Run = SimulationRun
 type TeamForecast = { team_id: number; name: string; fifa_code: string; win_group: number; finish_1: number; finish_2: number; finish_3: number; finish_4: number; top_two: number; advance_as_third: number; round_of_32: number; round_of_16: number; quarterfinal: number; semifinal: number; final: number; champion: number; eliminated: number; expected_group_points: number; expected_group_goals_for: number; expected_group_goals_against: number }
 type Projection = { teams: TeamForecast[] }
 type Triple = { team_a: number; draw: number; team_b: number }
 type MatchPrediction = { data_quality: string; lambda_a: number; lambda_b: number; final: Triple; model: Triple; market: Triple | null; score_distribution: number[][] }
 type ImportPreview = { id: string; record_count: number; status: string; errors: { row: number; message: string }[] }
 
-const nav: { to: string; label: string; activePrefix?: string }[] = [
+type NavItem = { to: string; label: string; activePrefix?: string }
+
+const forecastNav: NavItem[] = [
+  { to: '/bracket', label: 'Bracket', activePrefix: '/bracket' },
+  { to: '/groups/A', label: 'Groups', activePrefix: '/groups' },
+  { to: '/matches', label: 'Matches', activePrefix: '/matches' },
+  { to: '/teams', label: 'Teams', activePrefix: '/teams' },
+]
+
+const localNav: NavItem[] = [
   { to: '/groups/A', label: 'Groups', activePrefix: '/groups' },
   { to: '/matches', label: 'Matches', activePrefix: '/matches' },
   { to: '/simulator', label: 'Simulator', activePrefix: '/simulator' },
@@ -31,45 +47,62 @@ const nav: { to: string; label: string; activePrefix?: string }[] = [
   { to: '/admin/data', label: 'Admin', activePrefix: '/admin' },
 ]
 
-function SidebarNav() {
+const scenarioNav: NavItem[] = [
+  { to: '/scenario', label: 'Scenario', activePrefix: '/scenario' },
+]
+
+function SidebarNav({ items, sectionLabel }: { items: NavItem[]; sectionLabel?: string }) {
   const location = useLocation()
   return (
-    <nav>
-      {nav.map(({ to, label, activePrefix }) => {
-        const active = activePrefix ? location.pathname.startsWith(activePrefix) : undefined
-        return (
-          <NavLink
-            key={to}
-            to={to}
-            className={activePrefix ? (active ? 'active' : '') : ({ isActive }) => isActive ? 'active' : ''}
-          >
-            {label}
-          </NavLink>
-        )
-      })}
-    </nav>
+    <div className="sidebar-nav-section">
+      {sectionLabel && <span className="sidebar-section-label">{sectionLabel}</span>}
+      <nav>
+        {items.map(({ to, label, activePrefix }) => {
+          const active = activePrefix ? location.pathname.startsWith(activePrefix) : undefined
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className={activePrefix ? (active ? 'active' : '') : ({ isActive }) => isActive ? 'active' : ''}
+            >
+              {label}
+            </NavLink>
+          )
+        })}
+      </nav>
+    </div>
   )
 }
 
 function App() {
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">26</span><div><strong>Forecast</strong><small>World Cup intelligence</small></div></div>
-      <SidebarNav />
-      <SidebarSimulationStatus />
-      <div className="sidebar-note"><span className="live-dot" /> Local data workspace<small>Probabilities, not promises.</small></div>
+      <div className="brand"><span className="brand-mark">26</span><div><strong>Forecast</strong><small>{isPublishedMode ? 'Published forecast' : 'World Cup intelligence'}</small></div></div>
+      {isPublishedMode ? <>
+        <SidebarNav items={forecastNav} sectionLabel="Forecast" />
+        <SidebarNav items={scenarioNav} sectionLabel="Scenario" />
+        <SidebarPublishedStatus />
+      </> : <>
+        <SidebarNav items={localNav} />
+        <SidebarSimulationStatus />
+      </>}
+      <div className="sidebar-note"><span className="live-dot" /> {isPublishedMode ? 'Read-only public view' : 'Local data workspace'}<small>{isPublishedMode ? 'Latest published simulation.' : 'Probabilities, not promises.'}</small></div>
     </aside>
     <main className="main"><Routes>
-      <Route path="/" element={<Navigate to="/groups/A" replace />} />
+      <Route path="/" element={<Navigate to={isPublishedMode ? '/bracket' : '/groups/A'} replace />} />
       <Route path="/groups/:code" element={<GroupPage />} />
       <Route path="/matches" element={<MatchesPage />} />
       <Route path="/matches/:id" element={<MatchPage />} />
-      <Route path="/simulator" element={<SimulatorPage />} />
-      <Route path="/scenario" element={<ManualScenarioPage />} />
+      {!isPublishedMode && <Route path="/simulator" element={<SimulatorPage />} />}
+      <Route path="/scenario" element={isPublishedMode
+        ? <ManualScenarioPage readOnly fixedScores={publishedScenario ?? undefined} title={publishedScenarioTitle} description={publishedScenarioDescription} />
+        : <ManualScenarioPage />} />
       <Route path="/bracket" element={<BracketPage />} />
       <Route path="/teams" element={<TeamsPage />} />
       <Route path="/teams/:slug" element={<TeamPage />} />
-      <Route path="/admin/data" element={<AdminPage />} />
+      {!isPublishedMode && <Route path="/admin/data" element={<AdminPage />} />}
+      {isPublishedMode && <Route path="/simulator" element={<Navigate to="/bracket" replace />} />}
+      {isPublishedMode && <Route path="/admin/*" element={<Navigate to="/bracket" replace />} />}
     </Routes></main>
   </div>
 }
@@ -82,8 +115,7 @@ function GroupPage() {
   const { code = 'A' } = useParams()
   const groups = useQuery<Group[]>({ queryKey: ['groups'], queryFn: () => api('/groups') })
   const standings = useQuery<{ provisional: boolean; warnings: string[]; rows: Standing[]; as_of: string }>({ queryKey: ['standings', code], queryFn: () => api(`/groups/${code}/standings`) })
-  const runs = useRuns()
-  const latest = runs.data?.find(run => run.status === 'completed')
+  const { data: latest } = useLatestSimulation()
   const projection = useQuery<Projection>({ queryKey: ['projection', code, latest?.id], queryFn: () => api(`/groups/${code}/projection?simulation_id=${latest?.id}`), enabled: !!latest })
   const teamById = useMemo(() => {
     const map = new Map<number, Team>()
@@ -101,11 +133,11 @@ function GroupPage() {
     <section className="card"><div className="card-head"><div><span className="eyebrow">Current table</span><h2>What has happened</h2></div><span className="meta">As of {standings.data ? new Date(standings.data.as_of).toLocaleString() : '—'}</span></div>
       {standings.isLoading ? <Loading /> : <table className="standings"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>{standings.data?.rows.map(row => <tr key={row.team_id}><td><span className={`rank rank-${row.position}`}>{row.position}</span></td><td className="team-name"><NavLink className="team-link" to={teamPath({ name: row.name })}>{row.name}</NavLink></td><td>{row.played}</td><td>{row.won}</td><td>{row.drawn}</td><td>{row.lost}</td><td>{row.goal_difference > 0 ? '+' : ''}{row.goal_difference}</td><td><strong>{row.points}</strong></td></tr>)}</tbody></table>}
     </section>
-    <section className="card"><div className="card-head"><div><span className="eyebrow">Projection</span><h2>How the group may finish</h2></div><span className="meta">{latest ? `${latest.iterations.toLocaleString()} simulations` : 'Run a simulation to populate'}</span></div>
+    <section className="card"><div className="card-head"><div><span className="eyebrow">Projection</span><h2>How the group may finish</h2></div><span className="meta">{latest ? `${latest.iterations.toLocaleString()} simulations` : isPublishedMode ? 'Awaiting published forecast' : 'Run a simulation to populate'}</span></div>
       {projection.data ? <div className="prob-grid">{projection.data.teams.sort((a, b) => b.win_group - a.win_group).map(team => {
         const name = teamById.get(team.team_id)?.name ?? `Team ${team.team_id}`
         return <div className="prob-row" key={team.team_id}><NavLink className="team-link" to={teamPath({ name })}>{name}</NavLink><Probability label="Win group" value={team.win_group} /><Probability label="Top two" value={team.top_two} /><Probability label="Advance third" value={team.advance_as_third} /><Probability label="Eliminated" value={team.eliminated} tone="danger" /></div>
-      })}</div> : <Empty text="No completed simulation yet." />}
+      })}</div> : <Empty text={isPublishedMode ? 'Published forecast is not available yet.' : 'No completed simulation yet.'} />}
     </section>
   </>
 }
@@ -251,9 +283,8 @@ function SimulatorPage() {
 }
 
 function BracketPage() {
-  const runs = useRuns()
+  const { data: latest } = useLatestSimulation()
   const teams = useQuery<Team[]>({ queryKey: ['teams'], queryFn: () => api('/teams') })
-  const latest = runs.data?.find(run => run.status === 'completed')
   const bracket = useQuery<BracketRow[]>({
     queryKey: ['bracket', latest?.id],
     queryFn: () => api(`/simulations/${latest!.id}/bracket`),
@@ -265,7 +296,7 @@ function BracketPage() {
       title="Projected bracket"
       detail="Tournament tree with the most likely matchup in each slot and conditional advance probabilities from your latest simulation."
     />
-    {!latest && <Empty text="Complete a simulation to build matchup probabilities." />}
+    {!latest && <Empty text={isPublishedMode ? 'Published forecast is not available yet.' : 'Complete a simulation to build matchup probabilities.'} />}
     {latest && teams.data && bracket.data && (
       <BracketBoard
         rows={bracket.data}
@@ -299,8 +330,7 @@ function TeamsPage() {
 
 function TeamPage() {
   const { slug } = useParams()
-  const runs = useRuns()
-  const latest = runs.data?.find(run => run.status === 'completed')
+  const { data: latest } = useLatestSimulation()
   if (!slug) return null
   return <TeamPageView slug={slug} latestSimulationId={latest?.id} />
 }
@@ -321,12 +351,15 @@ function Probability({ label, value, tone }: { label: string; value: number; ton
 function Freshness({ provisional }: { provisional?: boolean }) { const pendingOrProvisional = provisional !== false; return <div className={`freshness ${pendingOrProvisional?'provisional':''}`}><span />{pendingOrProvisional?'Provisional data':'Data complete'}</div> }
 function Loading() { return <div className="empty">Loading tournament state…</div> }
 function Empty({ text }: { text: string }) { return <div className="empty">{text}</div> }
-function useRuns() {
-  return useQuery<Run[]>({
-    queryKey: ['runs'],
-    queryFn: () => api('/simulations'),
-    refetchInterval: query => query.state.data?.some(run => run.status === 'running' || run.status === 'queued') ? 500 : 10000,
-  })
+
+function SidebarPublishedStatus() {
+  const { data: latest, isLoading } = useLatestSimulation()
+  if (isLoading || !latest) return null
+  return <div className="sidebar-published">
+    <span className="eyebrow">Published run</span>
+    <strong>{latest.iterations.toLocaleString()} trials</strong>
+    <small>Seed {latest.seed} · cutoff {new Date(latest.input_cutoff_at).toLocaleDateString()}</small>
+  </div>
 }
 
 function SidebarSimulationStatus() {

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     admin_api_key: str | None = None
     enable_scheduler: bool = True
+    simulations_enabled: bool = True
+    published_simulation_id: str | None = None
     simulation_max_workers: int = 4
     attena_api_base: str = "https://attena-api.fly.dev/api/search/"
     kalshi_api_base: str = "https://api.elections.kalshi.com/trade-api/v2"

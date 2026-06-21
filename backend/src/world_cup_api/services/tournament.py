@@ -67,6 +67,7 @@ def list_matches(db: Session, group_code: str | None = None) -> list[dict]:
             "team_a": {"id": match.team_a.id, "name": match.team_a.name, "fifa_code": match.team_a.fifa_code} if match.team_a else None,
             "team_b": {"id": match.team_b.id, "name": match.team_b.name, "fifa_code": match.team_b.fifa_code} if match.team_b else None,
             "scheduled_at": match.scheduled_at, "status": match.status,
+            "host_country": match.host_country,
             "result": {"team_a_goals": result.team_a_goals_90, "team_b_goals": result.team_b_goals_90,
                        "revision": result.revision} if result else None,
         })

@@ -36,3 +36,17 @@ export function clearScenarioScores(
 ): void {
   storage.removeItem(SCENARIO_STORAGE_KEY)
 }
+
+export function exportScenarioScores(scores: ManualScores): string {
+  return JSON.stringify(scores, null, 2)
+}
+
+export function downloadScenarioScores(scores: ManualScores, filename = 'scenario.json'): void {
+  const blob = new Blob([exportScenarioScores(scores)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}

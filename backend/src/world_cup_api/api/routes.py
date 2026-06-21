@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from world_cup_api.api.dependencies import require_admin
 from world_cup_api.api.schemas import ResultInput, SimulationInput, SimulationStatus
+from world_cup_api.config import Settings, get_settings
 from world_cup_api.db.models import (
     BookmakerOdds, Group, PredictionMarketPrice, Simulation, SimulationBracketResult,
     SimulationGroupResult, SimulationTeamResult, Team, TournamentTeam, IngestionRun,
@@ -56,7 +57,7 @@ def team_forecast_route(team_ref: str, simulation_id: str, db: Session = Depends
         team = resolve_team(db, team_ref)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
-    run = _run_or_404(db, simulation_id)
+    run = _run_or_404(db, simulation_id, get_settings())
     row = db.get(SimulationTeamResult, (simulation_id, team.id))
     if not row:
         raise HTTPException(404, "Team forecast not found")
@@ -88,7 +89,7 @@ def standings(code: str, db: Session = Depends(get_db)) -> dict:
 
 @router.get("/groups/{code}/projection")
 def group_projection(code: str, simulation_id: str, db: Session = Depends(get_db)) -> dict:
-    run = _run_or_404(db, simulation_id)
+    run = _run_or_404(db, simulation_id, get_settings())
     group = db.scalar(select(Group).where(Group.code == code.upper()))
     if not group:
         raise HTTPException(404, "Group not found")
@@ -146,8 +147,33 @@ def market_prices(match_id: int, db: Session = Depends(get_db)) -> list[dict]:
              "volume": row.volume, "snapshot_at": row.snapshot_at} for row in rows]
 
 
+@router.get("/published")
+def published_forecast(db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> dict:
+    if not settings.published_simulation_id:
+        raise HTTPException(404, "Published forecast is not configured")
+    run = _run_or_404(db, settings.published_simulation_id, settings)
+    if run.status != "completed":
+        raise HTTPException(503, "Published forecast is not ready")
+    return {
+        "simulation_id": run.id,
+        "iterations": run.iterations,
+        "seed": run.seed,
+        "input_cutoff_at": run.input_cutoff_at,
+        "model_version": run.model_version,
+        "ruleset_version": run.ruleset_version,
+        "completed_at": run.completed_at,
+        "duration_ms": run.duration_ms,
+    }
+
+
 @router.post("/simulations", response_model=SimulationStatus, status_code=status.HTTP_202_ACCEPTED)
-def start_simulation(payload: SimulationInput, db: Session = Depends(get_db)) -> Simulation:
+def start_simulation(
+    payload: SimulationInput,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> Simulation:
+    if not settings.simulations_enabled:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Simulations are disabled on this server")
     run = create_simulation(db, payload.iterations, payload.seed, payload.force)
     if run.status == "queued":
         schedule_simulation(run.id)
@@ -155,18 +181,29 @@ def start_simulation(payload: SimulationInput, db: Session = Depends(get_db)) ->
 
 
 @router.get("/simulations", response_model=list[SimulationStatus])
-def simulations(db: Session = Depends(get_db)) -> list[Simulation]:
+def simulations(db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> list[Simulation]:
+    if settings.published_simulation_id:
+        run = db.get(Simulation, settings.published_simulation_id)
+        if not run:
+            raise HTTPException(404, "Published simulation not found")
+        return [run]
     return list(db.scalars(select(Simulation).order_by(Simulation.created_at.desc()).limit(50)))
 
 
 @router.get("/simulations/{simulation_id}", response_model=SimulationStatus)
-def simulation_status(simulation_id: str, db: Session = Depends(get_db)) -> Simulation:
-    return _run_or_404(db, simulation_id)
+def simulation_status(simulation_id: str, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> Simulation:
+    return _run_or_404(db, simulation_id, settings)
 
 
 @router.post("/simulations/{simulation_id}/cancel", response_model=SimulationStatus)
-def cancel_simulation(simulation_id: str, db: Session = Depends(get_db)) -> Simulation:
-    run = _run_or_404(db, simulation_id)
+def cancel_simulation(
+    simulation_id: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> Simulation:
+    if not settings.simulations_enabled:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Simulations are disabled on this server")
+    run = _run_or_404(db, simulation_id, settings)
     run.cancel_requested = True
     db.commit()
     db.refresh(run)
@@ -174,16 +211,16 @@ def cancel_simulation(simulation_id: str, db: Session = Depends(get_db)) -> Simu
 
 
 @router.get("/simulations/{simulation_id}/teams")
-def simulation_teams(simulation_id: str, db: Session = Depends(get_db)) -> list[dict]:
-    run = _run_or_404(db, simulation_id)
+def simulation_teams(simulation_id: str, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> list[dict]:
+    run = _run_or_404(db, simulation_id, settings)
     rows = db.execute(select(SimulationTeamResult, Team).join(Team, Team.id == SimulationTeamResult.team_id).where(
         SimulationTeamResult.simulation_id == simulation_id)).all()
     return [{**_team_probability(row, run), "name": team.name, "fifa_code": team.fifa_code} for row, team in rows]
 
 
 @router.get("/simulations/{simulation_id}/groups")
-def simulation_groups(simulation_id: str, db: Session = Depends(get_db)) -> list[dict]:
-    run = _run_or_404(db, simulation_id)
+def simulation_groups(simulation_id: str, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> list[dict]:
+    run = _run_or_404(db, simulation_id, settings)
     rows = db.scalars(select(SimulationGroupResult).where(SimulationGroupResult.simulation_id == simulation_id)
                       .order_by(SimulationGroupResult.group_id, SimulationGroupResult.occurrence_count.desc())).all()
     return [{"group_id": row.group_id, "order": [row.rank_1_team_id, row.rank_2_team_id, row.rank_3_team_id, row.rank_4_team_id],
@@ -191,8 +228,8 @@ def simulation_groups(simulation_id: str, db: Session = Depends(get_db)) -> list
 
 
 @router.get("/simulations/{simulation_id}/bracket")
-def simulation_bracket(simulation_id: str, db: Session = Depends(get_db)) -> list[dict]:
-    run = _run_or_404(db, simulation_id)
+def simulation_bracket(simulation_id: str, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> list[dict]:
+    run = _run_or_404(db, simulation_id, settings)
     rows = db.scalars(select(SimulationBracketResult).where(SimulationBracketResult.simulation_id == simulation_id)
                       .order_by(SimulationBracketResult.official_match_number, SimulationBracketResult.meeting_count.desc())).all()
     return [{"match_number": row.official_match_number, "team_a_id": row.team_a_id, "team_b_id": row.team_b_id,
@@ -317,7 +354,9 @@ def _triple(values) -> dict | None:
     return {"team_a": values[0], "draw": values[1], "team_b": values[2]} if values else None
 
 
-def _run_or_404(db: Session, simulation_id: str) -> Simulation:
+def _run_or_404(db: Session, simulation_id: str, settings: Settings) -> Simulation:
+    if settings.published_simulation_id and simulation_id != settings.published_simulation_id:
+        raise HTTPException(404, "Simulation not found")
     run = db.get(Simulation, simulation_id)
     if not run:
         raise HTTPException(404, "Simulation not found")

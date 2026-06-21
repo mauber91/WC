@@ -13,6 +13,7 @@ import {
 } from './scenarioEngine'
 import {
   clearScenarioScores,
+  downloadScenarioScores,
   loadScenarioScores,
   saveScenarioScores,
 } from './scenarioStorage'
@@ -157,12 +158,25 @@ function ThirdPlaceTable({ rows, complete, groupByTeam }: {
   )
 }
 
-export function ManualScenarioPage() {
+export function ManualScenarioPage({
+  readOnly = false,
+  fixedScores,
+  title = 'Manual group scenario',
+  description = 'Enter final scores for every unfinished group match and see the exact Round-of-32 slots those results create. This workspace never writes to the tournament database or changes simulations.',
+}: {
+  readOnly?: boolean
+  fixedScores?: ManualScores
+  title?: string
+  description?: string
+} = {}) {
   const groups = useQuery<ScenarioGroup[]>({ queryKey: ['groups'], queryFn: () => api('/groups') })
   const matches = useQuery<ScenarioMatch[]>({ queryKey: ['matches'], queryFn: () => api('/matches') })
-  const [scores, setScores] = useState<ManualScores>(() => loadScenarioScores())
+  const [scores, setScores] = useState<ManualScores>(() => fixedScores ?? loadScenarioScores())
 
-  useEffect(() => { saveScenarioScores(scores) }, [scores])
+  useEffect(() => {
+    if (readOnly || fixedScores) return
+    saveScenarioScores(scores)
+  }, [scores, readOnly, fixedScores])
 
   const outcome = useMemo(() => {
     if (!groups.data || !matches.data) return null
@@ -219,22 +233,28 @@ export function ManualScenarioPage() {
   return (
     <>
       <header className="page-header">
-        <div><span className="eyebrow">What-if workspace</span><h1>Manual group scenario</h1><p>Enter final scores for every unfinished group match and see the exact Round-of-32 slots those results create. This workspace never writes to the tournament database or changes simulations.</p></div>
-        <span className="local-only-badge">Saved in this browser only</span>
+        <div><span className="eyebrow">{readOnly ? 'Published what-if' : 'What-if workspace'}</span><h1>{title}</h1><p>{description}</p></div>
+        {!readOnly && <span className="local-only-badge">Saved in this browser only</span>}
       </header>
 
       {groups.isLoading || matches.isLoading || !outcome ? <div className="empty">Loading official tournament state…</div> : <>
-        <section className="card scenario-intro">
+        {!readOnly && <section className="card scenario-intro">
           <ScenarioProgress entered={outcome.enteredCount} total={outcome.totalRemaining} />
           <div className="scenario-actions">
             <button type="button" className="button ghost" onClick={fillEmptyDraws}>Fill empty fixtures 0–0</button>
+            <button type="button" className="button ghost" disabled={!Object.keys(scores).length} onClick={() => downloadScenarioScores(scores)}>Export for publish</button>
             <button type="button" className="button ghost danger-button" disabled={!Object.keys(scores).length} onClick={clearAll}>Clear scenario</button>
           </div>
-        </section>
+        </section>}
+
+        {readOnly && complete && <section className="card scenario-intro read-only">
+          <ScenarioProgress entered={outcome.enteredCount} total={outcome.totalRemaining} />
+          <span className="meta">Fixed scenario · not part of the Monte Carlo forecast</span>
+        </section>}
 
         {outcome.warnings.map(warning => <div className="warning" key={warning}>{warning}</div>)}
 
-        <section className="scenario-fixtures-section">
+        {!readOnly && <section className="scenario-fixtures-section">
           <div className="card-head"><div><span className="eyebrow">Your inputs</span><h2>Remaining group fixtures</h2></div><span className="meta">Official completed scores are locked</span></div>
           <div className="scenario-group-grid">
             {groups.data.map(group => <section className="card scenario-group-card" id={`scenario-group-${group.code}`} key={group.code}>
@@ -247,10 +267,10 @@ export function ManualScenarioPage() {
               />)}
             </section>)}
           </div>
-        </section>
+        </section>}
 
         <section className="scenario-standings-section">
-          <div className="card-head"><div><span className="eyebrow">Calculated locally</span><h2>Scenario standings</h2></div><span className="meta">Head-to-head rules applied</span></div>
+          <div className="card-head"><div><span className="eyebrow">{readOnly ? 'Published scenario' : 'Calculated locally'}</span><h2>Scenario standings</h2></div><span className="meta">Head-to-head rules applied</span></div>
           <div className="scenario-tables-grid">{outcome.tables.map(table => <GroupTable key={table.code} code={table.code} rows={table.rows} complete={table.complete} qualifiedThirds={qualifiedThirds} />)}</div>
         </section>
 
@@ -260,7 +280,7 @@ export function ManualScenarioPage() {
           <div className="card-head"><div><span className="eyebrow">Official slot assignment</span><h2>Knockout bracket</h2></div><span className="meta">FIFA Annex C</span></div>
           {outcome.bracket
             ? <ScenarioBracket matches={outcome.bracket} />
-            : <div className="scenario-bracket-locked"><strong>{outcome.totalRemaining - outcome.enteredCount} scores to go</strong><p>The bracket appears after every remaining group fixture has both scores.</p><a href="#scenario-group-A" className="button primary">Continue entering results</a></div>}
+            : <div className="scenario-bracket-locked"><strong>{outcome.totalRemaining - outcome.enteredCount} scores to go</strong><p>The bracket appears after every remaining group fixture has both scores.</p>{!readOnly && <a href="#scenario-group-A" className="button primary">Continue entering results</a>}</div>}
         </section>
       </>}
     </>

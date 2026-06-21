@@ -61,7 +61,19 @@ export type TeamFixture = {
   team_b: { id: number; name: string; fifa_code: string }
   scheduled_at: string
   status: string
+  host_country?: string | null
   result?: { team_a_goals: number; team_b_goals: number }
+}
+
+const CO_HOST_FIFA: Record<string, string> = {
+  USA: 'US',
+  CAN: 'CA',
+  MEX: 'MX',
+}
+
+function hostPlaysAtHome(fifaCode: string, hostCountry?: string | null): boolean {
+  if (!hostCountry) return false
+  return CO_HOST_FIFA[fifaCode] === hostCountry
 }
 
 export type TeamForecast = {
@@ -326,15 +338,24 @@ export function TeamPageView({ slug, latestSimulationId }: { slug: string; lates
           <div><span className="eyebrow">Schedule</span><h2>Fixtures</h2></div>
         </div>
         {team.data?.fixtures.map(match => {
-          const isHome = match.team_a.id === team.data?.id
-          const opponent = isHome ? match.team_b : match.team_a
+          const opponent = match.team_a.id === team.data?.id ? match.team_b : match.team_a
           const winProb = team.data ? teamMatchWinProb(team.data.id, match, predictionByMatchId.get(match.id)) : null
+          const teamHome = hostPlaysAtHome(team.data!.fifa_code, match.host_country)
+          const opponentHome = hostPlaysAtHome(opponent.fifa_code, match.host_country)
           return (
             <div className="team-fixture" key={match.id}>
               <span className="team-fixture-meta">M{match.official_match_number} · Group {match.group_code}</span>
               <div className="team-fixture-main">
                 <strong>
-                  {isHome ? 'vs' : '@'} {flagEmoji(opponent.fifa_code)} {opponent.name}
+                  vs {flagEmoji(opponent.fifa_code)} {opponent.name}
+                  {teamHome && (
+                    <small className="team-fixture-home" title="Co-host playing in their host country">Home</small>
+                  )}
+                  {!teamHome && opponentHome && (
+                    <small className="team-fixture-home opponent" title="Opponent co-host playing in their host country">
+                      {opponent.fifa_code} home
+                    </small>
+                  )}
                 </strong>
                 <span>
                   {match.result

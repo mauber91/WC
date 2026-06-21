@@ -38,6 +38,17 @@ squad-season-status:
 sync-markets:
 	cd backend && uv run python ../scripts/sync_markets.py
 
+publish:
+	cd backend && uv run python ../scripts/publish.py $(ARGS)
+
+deploy-fly:
+	chmod +x scripts/deploy_fly.sh
+	./scripts/deploy_fly.sh $(ARGS)
+
+deploy-pages:
+	chmod +x scripts/deploy_pages.sh
+	./scripts/deploy_pages.sh $(ARGS)
+
 refresh-tournament:
 	cd backend && uv run python ../scripts/refresh_tournament.py
 
