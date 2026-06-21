@@ -101,7 +101,7 @@ PUBLISHED_ID="$(python3 -c "import json; print(json.load(open('$MANIFEST'))['sim
 
 if [[ "$INIT_VOLUME" -eq 1 ]]; then
   echo "==> Creating Fly volume wc_data in ${REGION} (skip if it already exists)"
-  fly volumes create wc_data --app "$APP" --region "$REGION" --size 1 || true
+  fly volumes create wc_data --app "$APP" --region "$REGION" --size 1 --yes || true
 fi
 
 echo "==> Setting Fly secrets"
@@ -124,6 +124,7 @@ fi
 
 if [[ "$SKIP_DB_UPLOAD" -eq 0 ]]; then
   echo "==> Uploading published database to /data/app/worldcup.db"
+  fly ssh console --app "$APP" -C "rm -f /data/app/worldcup.db /data/app/worldcup.db-wal /data/app/worldcup.db-shm"
   fly ssh sftp put "$DB_FILE" /data/app/worldcup.db --app "$APP"
   echo "==> Restarting app to pick up database"
   fly apps restart "$APP"

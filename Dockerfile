@@ -15,6 +15,7 @@ RUN apt-get update \
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
+COPY backend/README.md ./README.md
 COPY backend/src ./src
 COPY backend/migrations ./migrations
 COPY backend/alembic.ini ./

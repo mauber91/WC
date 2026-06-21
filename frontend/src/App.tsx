@@ -5,13 +5,9 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { api, percent } from './api/client'
 import { BracketBoard, type BracketRow } from './components/BracketBoard'
 import { TeamPageView } from './components/TeamPage'
-import {
-  isPublishedMode,
-  publishedScenario,
-  publishedScenarioDescription,
-  publishedScenarioTitle,
-} from './config/appMode'
+import { isPublishedMode } from './config/appMode'
 import { ManualScenarioPage } from './features/manualScenario/ManualScenarioPage'
+import { MethodologyPage } from './pages/MethodologyPage'
 import { useLatestSimulation, useRuns, type SimulationRun } from './hooks/useLatestSimulation'
 import { flagEmoji } from './lib/flags'
 import { teamPath } from './lib/teamSlug'
@@ -35,6 +31,7 @@ const forecastNav: NavItem[] = [
   { to: '/groups/A', label: 'Groups', activePrefix: '/groups' },
   { to: '/matches', label: 'Matches', activePrefix: '/matches' },
   { to: '/teams', label: 'Teams', activePrefix: '/teams' },
+  { to: '/methodology', label: 'Methodology', activePrefix: '/methodology' },
 ]
 
 const localNav: NavItem[] = [
@@ -44,11 +41,12 @@ const localNav: NavItem[] = [
   { to: '/scenario', label: 'Scenario', activePrefix: '/scenario' },
   { to: '/bracket', label: 'Bracket', activePrefix: '/bracket' },
   { to: '/teams', label: 'Teams', activePrefix: '/teams' },
+  { to: '/methodology', label: 'Methodology', activePrefix: '/methodology' },
   { to: '/admin/data', label: 'Admin', activePrefix: '/admin' },
 ]
 
 const scenarioNav: NavItem[] = [
-  { to: '/scenario', label: 'Scenario', activePrefix: '/scenario' },
+  { to: '/scenario', label: 'Your bracket', activePrefix: '/scenario' },
 ]
 
 function SidebarNav({ items, sectionLabel }: { items: NavItem[]; sectionLabel?: string }) {
@@ -86,7 +84,7 @@ function App() {
         <SidebarNav items={localNav} />
         <SidebarSimulationStatus />
       </>}
-      <div className="sidebar-note"><span className="live-dot" /> {isPublishedMode ? 'Read-only public view' : 'Local data workspace'}<small>{isPublishedMode ? 'Latest published simulation.' : 'Probabilities, not promises.'}</small></div>
+      <div className="sidebar-note"><span className="live-dot" /> {isPublishedMode ? 'Forecast + what-if playground' : 'Local data workspace'}<small>{isPublishedMode ? 'Scenario scores stay in your browser.' : 'Probabilities, not promises.'}</small></div>
     </aside>
     <main className="main"><Routes>
       <Route path="/" element={<Navigate to={isPublishedMode ? '/bracket' : '/groups/A'} replace />} />
@@ -94,9 +92,8 @@ function App() {
       <Route path="/matches" element={<MatchesPage />} />
       <Route path="/matches/:id" element={<MatchPage />} />
       {!isPublishedMode && <Route path="/simulator" element={<SimulatorPage />} />}
-      <Route path="/scenario" element={isPublishedMode
-        ? <ManualScenarioPage readOnly fixedScores={publishedScenario ?? undefined} title={publishedScenarioTitle} description={publishedScenarioDescription} />
-        : <ManualScenarioPage />} />
+      <Route path="/scenario" element={<ManualScenarioPage />} />
+      <Route path="/methodology" element={<MethodologyPage />} />
       <Route path="/bracket" element={<BracketPage />} />
       <Route path="/teams" element={<TeamsPage />} />
       <Route path="/teams/:slug" element={<TeamPage />} />

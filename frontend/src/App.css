@@ -19,5 +19,7 @@
 
 .scenario-country-name{display:inline-flex;align-items:center;gap:7px;min-width:0}.scenario-flag{font-size:16px;line-height:1;flex:0 0 auto}.scenario-fixture .scenario-country-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+.method-section p,.method-section li{color:var(--muted);line-height:1.6;margin:0 0 12px;font-size:13px}.method-section p:last-child,.method-section ul:last-child,.method-section ol:last-child{margin-bottom:0}.method-formula{margin:12px 0;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:var(--sand);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.55;color:var(--ink);overflow-x:auto;white-space:pre-wrap}.method-steps,.method-list{margin:0;padding-left:20px;color:var(--muted);font-size:13px;line-height:1.65}.method-steps li,.method-list li{margin-bottom:8px}.method-note{font-size:12px!important;border-left:3px solid var(--acid);padding-left:12px}
+
 @media(max-width:1100px){.scenario-group-grid,.scenario-tables-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.scenario-intro{align-items:stretch;flex-direction:column}.scenario-progress{grid-template-columns:1fr}.scenario-progress>small{grid-column:1;grid-row:auto}.scenario-actions{justify-content:stretch}.scenario-actions .button{flex:1}.scenario-group-grid,.scenario-tables-grid{grid-template-columns:1fr}.manual-bracket-note{align-items:flex-start;flex-direction:column}.scenario-thirds{padding:16px}.local-only-badge{white-space:normal;text-align:center}}

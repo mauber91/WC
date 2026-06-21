@@ -162,7 +162,7 @@ export function ManualScenarioPage({
   readOnly = false,
   fixedScores,
   title = 'Manual group scenario',
-  description = 'Enter final scores for every unfinished group match and see the exact Round-of-32 slots those results create. This workspace never writes to the tournament database or changes simulations.',
+  description = 'Enter final scores for every unfinished group match and see the exact Round-of-32 slots those results create. Your inputs are saved in this browser only and never change the published forecast or simulation.',
 }: {
   readOnly?: boolean
   fixedScores?: ManualScores
