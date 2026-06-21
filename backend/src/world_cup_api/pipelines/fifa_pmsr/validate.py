@@ -146,7 +146,7 @@ def validate_bundle(bundle: ExtractionBundle) -> list[IssueRecord]:
 
 
 def calculate_quality(bundle: ExtractionBundle) -> tuple[float, float, dict[str, int]]:
-    classifications = Counter()
+    classifications: Counter[str] = Counter()
     for page in bundle.pages:
         for elements in page.payloads.values():
             classifications.update(str(element.get("classification", "missing")) for element in elements)

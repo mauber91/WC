@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
+import hashlib
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import Any, Iterable
 
 from world_cup_api.domain.name_match import normalize_name
 from world_cup_api.pipelines.fifa_pmsr.types import (
@@ -14,6 +15,7 @@ from world_cup_api.pipelines.fifa_pmsr.types import (
     ParticipantRecord,
     RawPage,
 )
+from world_cup_api.pipelines.fifa_pmsr.ocr import ocr_numeric_bbox
 
 
 PUA_DIGIT_MAP = {
@@ -51,7 +53,7 @@ class CoreExtraction:
     events: list[EventRecord] = field(default_factory=list)
     network_edges: list[NetworkEdgeRecord] = field(default_factory=list)
     issues: list[IssueRecord] = field(default_factory=list)
-    attempt_details: dict[tuple[str, int], dict[str, object]] = field(default_factory=dict)
+    attempt_details: dict[tuple[str, int], dict[str, Any]] = field(default_factory=dict)
 
 
 def decode_pua_number(value: str) -> float | None:
@@ -62,12 +64,12 @@ def decode_pua_number(value: str) -> float | None:
     return float(decoded)
 
 
-def _words(page: RawPage) -> list[dict[str, object]]:
+def _words(page: RawPage) -> list[dict[str, Any]]:
     return page.payloads.get("text_spans", [])
 
 
-def _line_groups(words: Iterable[dict[str, object]], tolerance: float = 1.0) -> list[list[dict[str, object]]]:
-    groups: list[list[dict[str, object]]] = []
+def _line_groups(words: Iterable[dict[str, Any]], tolerance: float = 1.0) -> list[list[dict[str, Any]]]:
+    groups: list[list[dict[str, Any]]] = []
     for word in sorted(words, key=lambda item: (float((item.get("bbox") or [0, 0])[1]), float((item.get("bbox") or [0])[0]))):
         top = float((word.get("bbox") or [0, 0])[1])
         if groups:
@@ -81,8 +83,8 @@ def _line_groups(words: Iterable[dict[str, object]], tolerance: float = 1.0) -> 
     return groups
 
 
-def _union_bbox(words: list[dict[str, object]]) -> list[float] | None:
-    boxes = [word.get("bbox") for word in words if word.get("bbox")]
+def _union_bbox(words: list[dict[str, Any]]) -> list[float] | None:
+    boxes: list[list[float]] = [list(word["bbox"]) for word in words if word.get("bbox")]
     if not boxes:
         return None
     return [
@@ -103,7 +105,7 @@ def _parse_minute(value: str) -> tuple[int, int | None] | None:
 def _participant_from_side(
     page_number: int,
     team: str,
-    row: list[dict[str, object]],
+    row: list[dict[str, Any]],
     side: str,
     is_starter: bool,
 ) -> tuple[ParticipantRecord | None, list[EventRecord]]:
@@ -320,6 +322,16 @@ def _extract_physical(page: RawPage, result: CoreExtraction) -> None:
             x0 = float((word.get("bbox") or [0])[0])
             column = min(range(len(PHYSICAL_METRICS)), key=lambda index: abs(x0 - [284, 364, 443, 527, 619, 697, 778, 850, 922][index]))
             value = decode_pua_number(str(word.get("text", "")))
+            method = "font_glyph_map"
+            confidence = 0.995
+            if value is None and word.get("bbox"):
+                value, confidence = ocr_numeric_bbox(
+                    page.render_uri,
+                    word["bbox"],
+                    page.width_points,
+                    page.height_points,
+                )
+                method = "targeted_tesseract_ocr"
             metric_key, unit = PHYSICAL_METRICS[column]
             if value is None:
                 result.issues.append(
@@ -347,8 +359,14 @@ def _extract_physical(page: RawPage, result: CoreExtraction) -> None:
                     is_explicit_zero=value == 0,
                     source_bbox=word.get("bbox"),
                     source_element_ids=[str(word["id"])],
-                    method="font_glyph_map",
-                    confidence=0.995,
+                    dimensions={
+                        "font_name": word.get("fontname"),
+                        "font_checksum": hashlib.sha256(
+                            str(word.get("fontname") or "unknown-font").encode("utf-8")
+                        ).hexdigest(),
+                    },
+                    method=method,
+                    confidence=confidence,
                 )
             )
 
@@ -365,7 +383,7 @@ def _cluster_centers(values: list[float], tolerance: float = 5.0) -> list[float]
 
 def _extract_network(page: RawPage, result: CoreExtraction) -> None:
     words = _words(page)
-    candidate_rows: list[tuple[float, str, list[dict[str, object]]]] = []
+    candidate_rows: list[tuple[float, str, list[dict[str, Any]]]] = []
     numeric_centers: list[float] = []
     for row in _line_groups(words, tolerance=1.0):
         top = float((row[0].get("bbox") or [0, 0])[1])

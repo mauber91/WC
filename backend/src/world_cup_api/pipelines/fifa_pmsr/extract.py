@@ -6,6 +6,7 @@ from world_cup_api.pipelines.fifa_pmsr.audit import write_audit_report
 from world_cup_api.pipelines.fifa_pmsr.constants import PIPELINE_VERSION
 from world_cup_api.pipelines.fifa_pmsr.extractors import extract_core_semantics, extract_visual_semantics
 from world_cup_api.pipelines.fifa_pmsr.extractors.core import PUA_DIGIT_MAP
+from world_cup_api.pipelines.fifa_pmsr.fontmap import write_font_map_registry
 from world_cup_api.pipelines.fifa_pmsr.inspect import inspect_report
 from world_cup_api.pipelines.fifa_pmsr.raw import extract_raw_pages
 from world_cup_api.pipelines.fifa_pmsr.template import load_template
@@ -87,6 +88,7 @@ def extract_report(
     else:
         bundle.status = "needs_review"
     bundle.stats = {**_stats(bundle), **{f"raw_{key}": value for key, value in raw_counts.items()}}
+    write_font_map_registry(pages, root / "font-maps.json")
     bundle.write_json(root / "extraction.json")
     write_audit_report(bundle, root / "audit.html")
     return bundle

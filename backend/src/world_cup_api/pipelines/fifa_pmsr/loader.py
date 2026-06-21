@@ -140,7 +140,7 @@ def load_extraction(session: Session, bundle: ExtractionBundle) -> MatchReportEx
     page_ids: dict[int, int] = {}
     for page in bundle.pages:
         team = teams.get(normalize_name(page.classification.team_scope or ""))
-        model = MatchReportPage(
+        page_model = MatchReportPage(
             run_id=run.id,
             document_id=document.id,
             page_number=page.page_number,
@@ -157,9 +157,9 @@ def load_extraction(session: Session, bundle: ExtractionBundle) -> MatchReportEx
             classification_confidence=page.classification.confidence,
             raw_element_count=page.element_count,
         )
-        session.add(model)
+        session.add(page_model)
         session.flush()
-        page_ids[page.page_number] = model.id
+        page_ids[page.page_number] = page_model.id
         for payload_type, elements in page.payloads.items():
             counts = {classification: 0 for classification in ("mapped", "decorative", "unresolved")}
             for element in elements:
@@ -167,7 +167,7 @@ def load_extraction(session: Session, bundle: ExtractionBundle) -> MatchReportEx
                 counts[classification] = counts.get(classification, 0) + 1
             session.add(
                 MatchReportPagePayload(
-                    page_id=model.id,
+                    page_id=page_model.id,
                     payload_type=payload_type,
                     payload_json=elements,
                     element_count=len(elements),
@@ -187,7 +187,7 @@ def load_extraction(session: Session, bundle: ExtractionBundle) -> MatchReportEx
         squad = None
         if team and participant.shirt_number is not None:
             squad = squad_by_team_number.get((team.id, participant.shirt_number))
-        model = MatchReportParticipant(
+        participant_model = MatchReportParticipant(
             run_id=run.id,
             page_id=page_ids.get(participant.page_number),
             team_id=team.id if team else None,
@@ -206,9 +206,9 @@ def load_extraction(session: Session, bundle: ExtractionBundle) -> MatchReportEx
             method=participant.method,
             confidence=participant.confidence,
         )
-        session.add(model)
+        session.add(participant_model)
         session.flush()
-        participant_ids[(normalize_name(participant.team_source_name), participant.normalized_name)] = model.id
+        participant_ids[(normalize_name(participant.team_source_name), participant.normalized_name)] = participant_model.id
 
     def participant_id(team_name: str | None, player_name: str | None) -> int | None:
         if not player_name:

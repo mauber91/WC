@@ -47,6 +47,7 @@ def ingest_report(
             .where(
                 MatchReportExtractionRun.document_id == document.id,
                 MatchReportExtractionRun.pipeline_version == PIPELINE_VERSION,
+                MatchReportExtractionRun.template_version == manifest.template_version,
                 MatchReportExtractionRun.status == "completed",
             )
             .order_by(MatchReportExtractionRun.attempt.desc())

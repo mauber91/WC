@@ -1,4 +1,4 @@
-.PHONY: setup dev-api dev-web test lint build migrate benchmark
+.PHONY: setup dev-api dev-web test lint build migrate benchmark report-inspect report-extract report-ingest
 
 setup:
 	cd backend && uv sync
@@ -54,3 +54,12 @@ build:
 
 benchmark:
 	cd backend && uv run python scripts/benchmark_simulation.py
+
+report-inspect:
+	cd backend && uv run world-cup-report inspect "$(FILE)"
+
+report-extract:
+	cd backend && uv run world-cup-report extract "$(FILE)" --output ../data/processed/match_reports
+
+report-ingest:
+	cd backend && uv run world-cup-report ingest "$(FILE)"

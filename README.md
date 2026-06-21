@@ -26,6 +26,20 @@ The bundled seed uses FIFA's published 2026 draw, official match schedule, FIFA 
 
 Accepted CSV datasets and required columns are documented in `docs/data-contracts/csv.md`.
 
+### FIFA post-match report extraction
+
+The backend includes a local, deterministic extraction pipeline for FIFA PMSR PDFs. It preserves the PDF's text/glyphs, tables, images, and vector primitives, then maps formations, pitch markers, arrows, shot/goal-mouth links, passing matrices, timelines, and physical-data glyphs into typed numeric records.
+
+```bash
+make migrate
+cd backend
+uv run world-cup-report inspect /path/to/PMSR.pdf
+uv run world-cup-report extract /path/to/PMSR.pdf --output ../data/processed/match_reports
+uv run world-cup-report ingest /path/to/PMSR.pdf
+```
+
+Raw PDFs are content-addressed under `data/raw/match_reports/`; generated renders, JSON, Parquet, font maps, and audit HTML are ignored under `data/processed/match_reports/`. The full contract and review policy are in [`docs/data-contracts/fifa-pmsr.md`](docs/data-contracts/fifa-pmsr.md).
+
 ### Live prediction markets (Polymarket + Kalshi)
 
 Upcoming fixture odds can be refreshed from [Attena](https://www.attena.xyz/) search (`https://attena-api.fly.dev/api/search/`). The sync builds queries from team names and kickoff dates, maps Attena hits to 1X2 selections, and enriches incomplete Kalshi brackets via the public Kalshi trade API.
@@ -80,4 +94,5 @@ Simulation runs freeze their inputs, model/rules/engine versions, seed, and cont
 - FastAPI application with SQLAlchemy 2 and Alembic.
 - SQLite WAL mode with one application scheduler.
 - APScheduler launches deterministic process-parallel Monte Carlo chunks.
+- FIFA PMSR reports use a versioned, template-aware, lossless extraction pipeline with SQLAlchemy, JSONL, and Parquet outputs.
 - RQ/Redis and PostgreSQL are deferred until multi-instance deployment is required.

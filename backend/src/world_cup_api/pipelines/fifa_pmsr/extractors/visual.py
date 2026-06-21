@@ -54,7 +54,11 @@ ARROW_REGIONS: dict[str, list[tuple[float, float, float, float]]] = {
 def _color(value: Any) -> tuple[float, float, float] | None:
     if not isinstance(value, list | tuple) or len(value) != 3:
         return None
-    return tuple(round(float(component), 4) for component in value)
+    return (
+        round(float(value[0]), 4),
+        round(float(value[1]), 4),
+        round(float(value[2]), 4),
+    )
 
 
 def _category(color: tuple[float, float, float] | None) -> str:
@@ -77,12 +81,12 @@ def _inside(x: float, y: float, bbox: tuple[float, float, float, float]) -> bool
 
 def _extract_attempt_map(
     page: RawPage,
-    details: dict[tuple[str, int], dict[str, object]],
+    details: dict[tuple[str, int], dict[str, Any]],
     result: VisualExtraction,
 ) -> None:
-    words = page.payloads.get("text_spans", [])
+    words = page.payloads.get("glyphs", [])
     team = page.classification.team_scope or ""
-    candidates: dict[int, dict[str, dict[str, object]]] = {}
+    candidates: dict[int, dict[str, dict[str, Any]]] = {}
     for word in words:
         text = str(word.get("text", ""))
         bbox = word.get("bbox")
@@ -379,7 +383,13 @@ def _extract_formations(
     }
     team_points: dict[str, list[tuple[float, float]]] = {"Brazil": [], "Haiti": []}
     for word in page.payloads.get("text_spans", []):
-        text = str(word.get("text", ""))
+        raw_text = str(word.get("text", ""))
+        if len(raw_text) % 2 == 0 and raw_text and all(
+            raw_text[index] == raw_text[index + 1] for index in range(0, len(raw_text), 2)
+        ):
+            text = raw_text[::2]
+        else:
+            text = raw_text
         bbox = word.get("bbox")
         if not text.isdigit() or bbox is None or not 1 <= int(text) <= 26:
             continue
@@ -503,7 +513,12 @@ def _extract_disciplinary_markers(
         nearest_player = min(
             participant_rows,
             key=lambda participant: abs(
-                vy - (float(participant.source_bbox[1]) + float(participant.source_bbox[3])) / 2
+                vy
+                - (
+                    float((participant.source_bbox or [0, 0, 0, 0])[1])
+                    + float((participant.source_bbox or [0, 0, 0, 0])[3])
+                )
+                / 2
             ),
             default=None,
         )
@@ -538,7 +553,7 @@ def _extract_disciplinary_markers(
 
 def extract_visual_semantics(
     pages: list[RawPage],
-    attempt_details: dict[tuple[str, int], dict[str, object]],
+    attempt_details: dict[tuple[str, int], dict[str, Any]],
     participants: list[ParticipantRecord] | None = None,
 ) -> VisualExtraction:
     result = VisualExtraction()

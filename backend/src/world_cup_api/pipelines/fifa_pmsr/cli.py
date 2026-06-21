@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -58,7 +59,15 @@ def _print(value: object) -> None:
 
 
 def _batch_extract(path: str) -> str:
-    bundle = extract_report(path, DEFAULT_ARTIFACT_ROOT)
+    manifest = inspect_report(path)
+    raw_dir = ROOT_DIR / "data" / "raw" / "match_reports"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    raw_path = raw_dir / f"{manifest.sha256}.pdf"
+    if not raw_path.exists():
+        shutil.copy2(path, raw_path)
+    bundle = extract_report(raw_path, DEFAULT_ARTIFACT_ROOT)
+    bundle.manifest.source_path = str(raw_path.resolve())
+    bundle.write_json(Path(bundle.artifact_root) / "extraction.json")
     return str(Path(bundle.artifact_root) / "extraction.json")
 
 
