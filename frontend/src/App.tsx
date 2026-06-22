@@ -300,6 +300,7 @@ function BracketPage() {
         teams={teams.data}
         iterations={latest.iterations}
         simulationId={latest.id}
+        resultCoverage={latest.result_coverage}
       />
     )}
     {latest && (!teams.data || !bracket.data) && <Loading />}

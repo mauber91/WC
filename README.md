@@ -20,6 +20,41 @@ make dev-web
 
 Open `http://localhost:5173`. API documentation is at `http://localhost:8000/docs`.
 
+## Run on a remote host (SSH / DGX Spark)
+
+Use this when the app should run on a Linux workstation (for example an NVIDIA DGX Spark) and you browse it from your laptop over SSH port forwarding.
+
+**On the remote host** (first time):
+
+```bash
+git clone <repo-url> WC && cd WC
+make remote-setup
+# edit .env — at minimum WC_API_FOOTBALL_KEY
+```
+
+**On the remote host** (each dev session):
+
+```bash
+make dev-remote
+```
+
+`dev-remote` binds API and Vite to `127.0.0.1` so they are only reachable through SSH (not the LAN).
+
+**On your laptop** (separate terminal, while `dev-remote` is running):
+
+```bash
+make ssh-tunnel REMOTE=user@your-dgx-spark
+```
+
+Then open `http://localhost:5173` locally. The frontend calls `http://localhost:8000/api/v1`, which the tunnel forwards to the remote API.
+
+Tips:
+
+- **Cursor / VS Code Remote SSH**: open the repo on the remote machine, run `make dev-remote` in the integrated terminal, and use the editor's port forwarding for `5173` and `8000`.
+- **More simulation workers** on a beefy host: set `WC_SIMULATION_MAX_WORKERS` in `.env` (DGX Spark can handle more than a laptop).
+- **Direct LAN access** (no tunnel): run `WC_DEV_HOST=0.0.0.0 ./scripts/dev_remote.sh` on the remote host and set `VITE_API_BASE_URL=http://<spark-ip>:8000/api/v1` in `.env` before `npm run dev` (or rebuild the frontend).
+- **FIFA PDF extraction** additionally needs `tesseract-ocr` on the host: `sudo apt-get install -y tesseract-ocr`.
+
 ## Data status
 
 The bundled seed uses FIFA's published 2026 draw, official match schedule, FIFA rankings (2026-06-11 edition), World Football Elo ratings, group-stage results through 2026-06-20 (with conduct columns where FIFA reports exist), and pre-match bookmaker/prediction-market snapshots for remaining fixtures. Regenerate seed CSVs with `make seed-data` after importing newer fixtures, rankings, results, or market data through the admin page.

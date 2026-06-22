@@ -20,6 +20,7 @@ from world_cup_api.services.results import remove_current_result, revise_result
 from world_cup_api.services.champion_market_sync import sync_wc_champion_markets
 from world_cup_api.services.market_sync import sync_upcoming_markets
 from world_cup_api.services.tournament_refresh import refresh_tournament_data
+from world_cup_api.services.simulation_coverage import compute_result_coverage
 from world_cup_api.services.simulations import create_simulation
 from world_cup_api.domain.teams import team_slug
 from world_cup_api.services.teams import resolve_team, team_detail
@@ -163,6 +164,7 @@ def published_forecast(db: Session = Depends(get_db), settings: Settings = Depen
         "ruleset_version": run.ruleset_version,
         "completed_at": run.completed_at,
         "duration_ms": run.duration_ms,
+        "result_coverage": compute_result_coverage(db, run).to_dict(),
     }
 
 
@@ -171,28 +173,29 @@ def start_simulation(
     payload: SimulationInput,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> Simulation:
+) -> SimulationStatus:
     if not settings.simulations_enabled:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Simulations are disabled on this server")
     run = create_simulation(db, payload.iterations, payload.seed, payload.force)
     if run.status == "queued":
         schedule_simulation(run.id)
-    return run
+    return _simulation_status(db, run)
 
 
 @router.get("/simulations", response_model=list[SimulationStatus])
-def simulations(db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> list[Simulation]:
+def simulations(db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> list[SimulationStatus]:
     if settings.published_simulation_id:
         run = db.get(Simulation, settings.published_simulation_id)
         if not run:
             raise HTTPException(404, "Published simulation not found")
-        return [run]
-    return list(db.scalars(select(Simulation).order_by(Simulation.created_at.desc()).limit(50)))
+        return [_simulation_status(db, run)]
+    runs = list(db.scalars(select(Simulation).order_by(Simulation.created_at.desc()).limit(50)))
+    return [_simulation_status(db, run) for run in runs]
 
 
 @router.get("/simulations/{simulation_id}", response_model=SimulationStatus)
-def simulation_status(simulation_id: str, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> Simulation:
-    return _run_or_404(db, simulation_id, settings)
+def simulation_status(simulation_id: str, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> SimulationStatus:
+    return _simulation_status(db, _run_or_404(db, simulation_id, settings))
 
 
 @router.post("/simulations/{simulation_id}/cancel", response_model=SimulationStatus)
@@ -200,14 +203,14 @@ def cancel_simulation(
     simulation_id: str,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> Simulation:
+) -> SimulationStatus:
     if not settings.simulations_enabled:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Simulations are disabled on this server")
     run = _run_or_404(db, simulation_id, settings)
     run.cancel_requested = True
     db.commit()
     db.refresh(run)
-    return run
+    return _simulation_status(db, run)
 
 
 @router.get("/simulations/{simulation_id}/teams")
@@ -352,6 +355,12 @@ def _standing_dict(row) -> dict:
 
 def _triple(values) -> dict | None:
     return {"team_a": values[0], "draw": values[1], "team_b": values[2]} if values else None
+
+
+def _simulation_status(db: Session, run: Simulation) -> SimulationStatus:
+    payload = SimulationStatus.model_validate(run).model_dump()
+    payload["result_coverage"] = compute_result_coverage(db, run).to_dict()
+    return SimulationStatus.model_validate(payload)
 
 
 def _run_or_404(db: Session, simulation_id: str, settings: Settings) -> Simulation:

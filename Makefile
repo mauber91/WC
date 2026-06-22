@@ -1,4 +1,4 @@
-.PHONY: setup dev-api dev-web test lint build migrate benchmark report-inspect report-extract report-ingest
+.PHONY: setup dev-api dev-web dev-remote remote-setup ssh-tunnel spark-ping spark-sync spark-setup spark-dev spark-tunnel test lint build migrate benchmark report-inspect report-extract report-ingest
 
 setup:
 	cd backend && uv sync
@@ -10,6 +10,25 @@ dev-api:
 
 dev-web:
 	cd frontend && npm run dev
+
+dev-remote:
+	chmod +x scripts/dev_remote.sh
+	WC_DEV_HOST=127.0.0.1 ./scripts/dev_remote.sh
+
+remote-setup:
+	chmod +x scripts/remote_setup.sh
+	./scripts/remote_setup.sh
+
+REMOTE ?=
+
+ssh-tunnel:
+	chmod +x scripts/ssh_tunnel.sh
+	@if [ -z "$(REMOTE)" ]; then echo "Usage: make ssh-tunnel REMOTE=user@your-dgx-spark"; exit 1; fi
+	REMOTE="$(REMOTE)" ./scripts/ssh_tunnel.sh
+
+spark-ping spark-sync spark-setup spark-dev spark-tunnel spark-start:
+	chmod +x scripts/spark.sh
+	./scripts/spark.sh $(subst spark-,,$@)
 
 migrate:
 	cd backend && uv run alembic upgrade head

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { percent } from '../api/client'
 import { bracketExportFilename, exportBracketPng } from '../lib/exportBracketPng'
 import { flagEmoji } from '../lib/flags'
+import { formatSimulationCoverage, type SimulationResultCoverage } from '../lib/simulationCoverage'
 import { buildCoherentMatchMap, buildR32SlotLeaderboards, type BracketMatch, type BracketRow, type R32MatchSlotLeaders } from '../lib/bracketPath'
 import {
   BRACKET_COL as COL,
@@ -202,11 +203,13 @@ export function BracketBoard({
   teams,
   iterations,
   simulationId,
+  resultCoverage,
 }: {
   rows: BracketRow[]
   teams: Team[]
   iterations: number
   simulationId?: string
+  resultCoverage?: SimulationResultCoverage
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -235,8 +238,15 @@ export function BracketBoard({
     }
   }
 
+  const coverageMessage = formatSimulationCoverage(resultCoverage)
+
   return (
     <div className="bracket-tree-wrap">
+      {coverageMessage && (
+        <div className={`bracket-coverage${resultCoverage?.is_stale ? ' stale' : ''}`}>
+          {coverageMessage}
+        </div>
+      )}
       <div className="bracket-toolbar">
         <p className="bracket-meta">
           One projected path through the bracket from {iterations.toLocaleString()} simulations.

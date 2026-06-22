@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { isPublishedMode, publishedSimulationId } from '../config/appMode'
+import type { SimulationResultCoverage } from '../lib/simulationCoverage'
 
 export type SimulationRun = {
   id: string
@@ -13,6 +14,7 @@ export type SimulationRun = {
   ruleset_version: string
   duration_ms?: number
   error_message?: string
+  result_coverage?: SimulationResultCoverage
 }
 
 type PublishedMeta = {
@@ -24,6 +26,7 @@ type PublishedMeta = {
   ruleset_version: string
   completed_at?: string
   duration_ms?: number
+  result_coverage?: SimulationResultCoverage
 }
 
 function usePublishedSimulation() {

@@ -177,6 +177,7 @@ def build_input_snapshot(db: Session) -> tuple[dict, str]:
 
     raw_group_matches: dict[str, list[dict[str, Any]]] = {}
     groups: dict[str, dict] = {}
+    locked_match_numbers: list[int] = []
     for group in db.scalars(select(Group).order_by(Group.sort_order)):
         group_teams = [value for value in teams.values() if value["group_id"] == group.id]
         group_matches: list[dict[str, Any]] = []
@@ -184,6 +185,7 @@ def build_input_snapshot(db: Session) -> tuple[dict, str]:
             current = db.scalar(select(MatchResult).where(MatchResult.match_id == match.id, MatchResult.is_current.is_(True)))
             item: dict[str, Any] = {
                 "id": match.id,
+                "official_match_number": match.official_match_number,
                 "a": match.team_a_id,
                 "b": match.team_b_id,
                 "scheduled_at": match.scheduled_at,
@@ -195,6 +197,7 @@ def build_input_snapshot(db: Session) -> tuple[dict, str]:
                     current.conduct_a, current.conduct_b,
                     current.red_cards_a, current.red_cards_b,
                 ]
+                locked_match_numbers.append(match.official_match_number)
             group_matches.append(item)
         raw_group_matches[group.code] = group_matches
         context_by_match = group_match_context(group_matches, fifa_by_id)
@@ -246,6 +249,7 @@ def build_input_snapshot(db: Session) -> tuple[dict, str]:
         "tournament_id": tournament.id,
         "ruleset_version": tournament.ruleset_version,
         "cutoff": datetime.now(timezone.utc).isoformat(),
+        "locked_match_numbers": sorted(locked_match_numbers),
         "teams": teams,
         "groups": groups,
         "knockout_venues": knockout_venues(),

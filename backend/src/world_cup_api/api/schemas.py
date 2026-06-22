@@ -32,6 +32,15 @@ class SimulationInput(BaseModel):
     force: bool = False
 
 
+class SimulationResultCoverage(BaseModel):
+    is_stale: bool
+    last_locked_match_number: int | None
+    stale_before_match_number: int | None
+    pending_result_count: int
+    stale_before_match_label: str | None
+    last_locked_match_label: str | None
+
+
 class SimulationStatus(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -45,6 +54,7 @@ class SimulationStatus(BaseModel):
     engine_version: str
     duration_ms: int | None
     error_message: str | None
+    result_coverage: SimulationResultCoverage | None = None
 
 
 class ProbabilityTriple(BaseModel):
