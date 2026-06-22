@@ -3,45 +3,25 @@ import { percent } from '../api/client'
 import { bracketExportFilename, exportBracketPng } from '../lib/exportBracketPng'
 import { flagEmoji } from '../lib/flags'
 import { buildCoherentMatchMap, buildR32SlotLeaderboards, type BracketMatch, type BracketRow, type R32MatchSlotLeaders } from '../lib/bracketPath'
+import {
+  BRACKET_COL as COL,
+  FINAL_SLOT,
+  JOIN_QF_SF,
+  JOIN_R16_QF,
+  JOIN_R32_R16,
+  JOIN_SF_FINAL,
+  QF_SLOTS,
+  R16_SLOTS,
+  R32_SLOTS,
+  SF_SLOTS,
+  bracketRowStyle,
+  type BracketJoin as Join,
+  type BracketSlot,
+} from '../lib/bracketLayout'
 
 export type { BracketRow }
 
 type Team = { id: number; fifa_code: string; name: string; country_code?: string }
-
-type Slot = { match: number; row: number; span: number }
-
-const R32_SLOTS: Slot[] = [
-  { match: 73, row: 1, span: 1 }, { match: 75, row: 2, span: 1 },
-  { match: 74, row: 3, span: 1 }, { match: 77, row: 4, span: 1 },
-  { match: 83, row: 5, span: 1 }, { match: 84, row: 6, span: 1 },
-  { match: 81, row: 7, span: 1 }, { match: 82, row: 8, span: 1 },
-  { match: 76, row: 9, span: 1 }, { match: 78, row: 10, span: 1 },
-  { match: 79, row: 11, span: 1 }, { match: 80, row: 12, span: 1 },
-  { match: 86, row: 13, span: 1 }, { match: 88, row: 14, span: 1 },
-  { match: 85, row: 15, span: 1 }, { match: 87, row: 16, span: 1 },
-]
-
-const R16_SLOTS: Slot[] = [
-  { match: 90, row: 1, span: 2 }, { match: 89, row: 3, span: 2 },
-  { match: 93, row: 5, span: 2 }, { match: 94, row: 7, span: 2 },
-  { match: 91, row: 9, span: 2 }, { match: 92, row: 11, span: 2 },
-  { match: 95, row: 13, span: 2 }, { match: 96, row: 15, span: 2 },
-]
-
-/** QF order 97, 98, 99, 100 so SF101 joins 97+98 and SF102 joins 99+100. */
-const QF_SLOTS: Slot[] = [
-  { match: 97, row: 1, span: 4 },
-  { match: 98, row: 5, span: 4 },
-  { match: 99, row: 9, span: 4 },
-  { match: 100, row: 13, span: 4 },
-]
-
-const SF_SLOTS: Slot[] = [
-  { match: 101, row: 1, span: 8 },
-  { match: 102, row: 9, span: 8 },
-]
-
-const FINAL_SLOT: Slot = { match: 104, row: 1, span: 16 }
 
 const KNOCKOUT_SCHEDULE: Record<number, string> = {
   73: '2026-06-28T17:00:00Z', 74: '2026-06-29T19:00:00Z', 75: '2026-06-29T14:00:00Z', 76: '2026-06-29T22:00:00Z',
@@ -53,26 +33,6 @@ const KNOCKOUT_SCHEDULE: Record<number, string> = {
   97: '2026-07-09T20:00:00Z', 98: '2026-07-10T20:00:00Z', 99: '2026-07-11T17:00:00Z', 100: '2026-07-11T21:00:00Z',
   101: '2026-07-14T19:00:00Z', 102: '2026-07-15T19:00:00Z', 104: '2026-07-19T19:00:00Z',
 }
-
-type Join = { row: number; span: number }
-
-const JOIN_R32_R16: Join[] = [
-  { row: 1, span: 2 }, { row: 3, span: 2 }, { row: 5, span: 2 }, { row: 7, span: 2 },
-  { row: 9, span: 2 }, { row: 11, span: 2 }, { row: 13, span: 2 }, { row: 15, span: 2 },
-]
-
-const JOIN_R16_QF: Join[] = [
-  { row: 1, span: 4 }, { row: 5, span: 4 }, { row: 9, span: 4 }, { row: 13, span: 4 },
-]
-
-const JOIN_QF_SF: Join[] = [
-  { row: 1, span: 8 },
-  { row: 9, span: 8 },
-]
-
-const JOIN_SF_FINAL: Join[] = [{ row: 1, span: 16 }]
-
-const COL = { r32: 1, c1: 2, r16: 3, c2: 4, qf: 5, c3: 6, sf: 7, c4: 8, final: 9 } as const
 
 function formatSchedule(iso: string | null, matchNumber: number) {
   if (!iso) return { day: 'TBD', time: '—', date: `M${matchNumber}` }
@@ -93,7 +53,7 @@ function buildMatchMap(rows: BracketRow[], teams: Team[]): Map<number, BracketMa
 }
 
 function rowStyle(row: number, span: number): CSSProperties {
-  return { gridRow: `${row + 1} / span ${span}` }
+  return bracketRowStyle(row, span)
 }
 
 function BracketMatchCard({ match, matchNumber, isFinal = false }: {
@@ -189,7 +149,7 @@ function R32SlotTooltip({ matchNumber, leaders, teams }: {
 }
 
 function R32MatchCell({ slot, matchMap, slotLeaders, teams }: {
-  slot: Slot
+  slot: BracketSlot
   matchMap: Map<number, BracketMatch>
   slotLeaders: Map<number, R32MatchSlotLeaders>
   teams: Team[]
@@ -210,7 +170,7 @@ function R32MatchCell({ slot, matchMap, slotLeaders, teams }: {
 }
 
 function MatchCell({ slot, column, matchMap, isFinal }: {
-  slot: Slot
+  slot: BracketSlot
   column: number
   matchMap: Map<number, BracketMatch>
   isFinal?: boolean

@@ -1,6 +1,7 @@
-import type { ManualScores } from './scenarioEngine'
+import type { KnockoutPicks, ManualScores } from './scenarioEngine'
 
 export const SCENARIO_STORAGE_KEY = 'world-cup-manual-scenario:v1'
+export const KNOCKOUT_PICKS_STORAGE_KEY = 'world-cup-knockout-picks:v1'
 
 function validGoal(value: unknown): value is number | null {
   return value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 99)
@@ -35,6 +36,28 @@ export function clearScenarioScores(
   storage: Pick<Storage, 'removeItem'> = window.localStorage,
 ): void {
   storage.removeItem(SCENARIO_STORAGE_KEY)
+  storage.removeItem(KNOCKOUT_PICKS_STORAGE_KEY)
+}
+
+export function loadKnockoutPicks(storage: Pick<Storage, 'getItem'> = window.localStorage): KnockoutPicks {
+  try {
+    const raw = storage.getItem(KNOCKOUT_PICKS_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => typeof value === 'number' && Number.isInteger(value) && value > 0),
+    ) as KnockoutPicks
+  } catch {
+    return {}
+  }
+}
+
+export function saveKnockoutPicks(
+  picks: KnockoutPicks,
+  storage: Pick<Storage, 'setItem'> = window.localStorage,
+): void {
+  storage.setItem(KNOCKOUT_PICKS_STORAGE_KEY, JSON.stringify(picks))
 }
 
 export function exportScenarioScores(scores: ManualScores): string {

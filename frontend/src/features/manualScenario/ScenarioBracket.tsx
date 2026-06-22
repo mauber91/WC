@@ -1,112 +1,244 @@
+import { useRef, useState } from 'react'
+import { exportBracketPng, scenarioBracketExportFilename } from '../../lib/exportBracketPng'
 import { flagEmoji } from '../../lib/flags'
-import type { ScenarioBracketMatch, ScenarioTeam } from './scenarioEngine'
+import {
+  BRACKET_COL,
+  FINAL_SLOT,
+  JOIN_QF_SF,
+  JOIN_R16_QF,
+  JOIN_R32_R16,
+  JOIN_SF_FINAL,
+  QF_SLOTS,
+  R16_SLOTS,
+  R32_SLOTS,
+  SF_SLOTS,
+  bracketRowStyle,
+  type BracketJoin,
+  type BracketSlot,
+} from '../../lib/bracketLayout'
+import type { ResolvedKnockoutMatch, ScenarioTeam } from './scenarioEngine'
 
-type Slot = { match: number; row: number; span: number; sources?: [number, number] }
-
-const R32_SLOTS: Slot[] = [
-  { match: 73, row: 1, span: 1 }, { match: 75, row: 2, span: 1 },
-  { match: 74, row: 3, span: 1 }, { match: 77, row: 4, span: 1 },
-  { match: 83, row: 5, span: 1 }, { match: 84, row: 6, span: 1 },
-  { match: 81, row: 7, span: 1 }, { match: 82, row: 8, span: 1 },
-  { match: 76, row: 9, span: 1 }, { match: 78, row: 10, span: 1 },
-  { match: 79, row: 11, span: 1 }, { match: 80, row: 12, span: 1 },
-  { match: 86, row: 13, span: 1 }, { match: 88, row: 14, span: 1 },
-  { match: 85, row: 15, span: 1 }, { match: 87, row: 16, span: 1 },
-]
-
-const R16_SLOTS: Slot[] = [
-  { match: 90, row: 1, span: 2, sources: [73, 75] },
-  { match: 89, row: 3, span: 2, sources: [74, 77] },
-  { match: 93, row: 5, span: 2, sources: [83, 84] },
-  { match: 94, row: 7, span: 2, sources: [81, 82] },
-  { match: 91, row: 9, span: 2, sources: [76, 78] },
-  { match: 92, row: 11, span: 2, sources: [79, 80] },
-  { match: 95, row: 13, span: 2, sources: [86, 88] },
-  { match: 96, row: 15, span: 2, sources: [85, 87] },
-]
-
-const QF_SLOTS: Slot[] = [
-  { match: 97, row: 1, span: 4, sources: [89, 90] },
-  { match: 98, row: 5, span: 4, sources: [93, 94] },
-  { match: 99, row: 9, span: 4, sources: [91, 92] },
-  { match: 100, row: 13, span: 4, sources: [95, 96] },
-]
-
-const SF_SLOTS: Slot[] = [
-  { match: 101, row: 1, span: 8, sources: [97, 98] },
-  { match: 102, row: 9, span: 8, sources: [99, 100] },
-]
-
-const FINAL_SLOT: Slot = { match: 104, row: 1, span: 16, sources: [101, 102] }
-
-function TeamLine({ team, source }: { team: ScenarioTeam; source: string }) {
+function PickableTeam({
+  team,
+  source,
+  picked,
+  disabled,
+  onPick,
+}: {
+  team: ScenarioTeam
+  source?: string
+  picked: boolean
+  disabled: boolean
+  onPick: () => void
+}) {
   return (
-    <div className="manual-bracket-team">
-      <span className="manual-bracket-flag" aria-hidden>{flagEmoji(team.fifa_code)}</span>
-      <span><strong>{team.name}</strong><small>{source}</small></span>
+    <button
+      type="button"
+      className={`bracket-team scenario-pickable${picked ? ' scenario-picked' : ''}`}
+      disabled={disabled}
+      aria-pressed={picked}
+      onClick={onPick}
+    >
+      <span className="bracket-flag" aria-hidden>{flagEmoji(team.fifa_code)}</span>
+      <span>
+        <span className="bracket-team-name" title={team.name}>{team.name}</span>
+        {source && <small className="scenario-bracket-source">{source}</small>}
+      </span>
+      {picked && <span className="scenario-pick-badge">Your pick</span>}
+    </button>
+  )
+}
+
+function KnockoutMatchCard({
+  match,
+  isFinal = false,
+  interactive,
+  exporting,
+  onPick,
+}: {
+  match: ResolvedKnockoutMatch
+  isFinal?: boolean
+  interactive: boolean
+  exporting: boolean
+  onPick: (matchNumber: number, teamId: number) => void
+}) {
+  const ready = match.teamA != null && match.teamB != null
+  const badge = ready
+    ? (match.winnerId != null
+      ? (exporting ? 'Your pick' : 'Your pick set')
+      : (exporting ? 'Open' : 'Click to advance'))
+    : 'Awaiting picks'
+
+  return (
+    <article className={`bracket-match-card scenario-knockout-card${isFinal ? ' final' : ''}${ready ? '' : ' empty'}`}>
+      <div className="bracket-match-body">
+        <header className="bracket-match-head">
+          <span className="bracket-badge">{badge}</span>
+          <span className="bracket-match-no">M{match.matchNumber}</span>
+        </header>
+        {ready ? (
+          <div className="bracket-teams">
+            <PickableTeam
+              team={match.teamA!}
+              source={match.sourceA}
+              picked={match.winnerId === match.teamA!.id}
+              disabled={!interactive}
+              onPick={() => onPick(match.matchNumber, match.teamA!.id)}
+            />
+            <PickableTeam
+              team={match.teamB!}
+              source={match.sourceB}
+              picked={match.winnerId === match.teamB!.id}
+              disabled={!interactive}
+              onPick={() => onPick(match.matchNumber, match.teamB!.id)}
+            />
+          </div>
+        ) : (
+          <div className="scenario-knockout-feeders">
+            {match.pendingFeeders?.map(feeder => (
+              <div className="scenario-knockout-feeder" key={feeder}>Winner M{feeder}</div>
+            )) ?? <p>Enter group scores to set Round-of-32 slots.</p>}
+          </div>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function JoinCell({ join, column }: { join: BracketJoin; column: number }) {
+  return (
+    <div className="bracket-join" style={{ ...bracketRowStyle(join.row, join.span), gridColumn: column }}>
+      <svg className="bracket-join-svg" viewBox="0 0 532 100" preserveAspectRatio="none" aria-hidden>
+        <path
+          d="M 252 25 H 280 M 252 75 H 280 M 280 25 V 75"
+          fill="none"
+          className="bracket-join-line"
+        />
+      </svg>
     </div>
   )
 }
 
-function RoundOf32Card({ match }: { match: ScenarioBracketMatch }) {
-  return (
-    <article className="manual-bracket-card confirmed">
-      <header><span>Group stage set</span><b>M{match.matchNumber}</b></header>
-      <TeamLine team={match.teamA} source={match.sourceA} />
-      <TeamLine team={match.teamB} source={match.sourceB} />
-    </article>
-  )
-}
-
-function PlaceholderCard({ slot }: { slot: Slot }) {
-  return (
-    <article className="manual-bracket-card placeholder">
-      <header><span>Awaiting knockout</span><b>M{slot.match}</b></header>
-      {slot.sources?.map(source => <div className="manual-bracket-source" key={source}>Winner M{source}</div>)}
-    </article>
-  )
-}
-
-function RoundColumn({ title, slots, matches }: {
-  title: string
-  slots: Slot[]
-  matches?: Map<number, ScenarioBracketMatch>
+function MatchCell({
+  slot,
+  column,
+  matchMap,
+  isFinal = false,
+  interactive,
+  exporting,
+  onPick,
+}: {
+  slot: BracketSlot
+  column: number
+  matchMap: Map<number, ResolvedKnockoutMatch>
+  isFinal?: boolean
+  interactive: boolean
+  exporting: boolean
+  onPick: (matchNumber: number, teamId: number) => void
 }) {
+  const match = matchMap.get(slot.match)
   return (
-    <section className="manual-bracket-round">
-      <h3>{title}</h3>
-      <div className="manual-bracket-round-grid">
-        {slots.map(slot => (
-          <div
-            className="manual-bracket-slot"
-            style={{ gridRow: `${slot.row} / span ${slot.span}` }}
-            key={slot.match}
-          >
-            {matches?.get(slot.match)
-              ? <RoundOf32Card match={matches.get(slot.match)!} />
-              : <PlaceholderCard slot={slot} />}
-          </div>
-        ))}
-      </div>
-    </section>
+    <div className="bracket-grid-cell" style={{ ...bracketRowStyle(slot.row, slot.span), gridColumn: column }}>
+      {match
+        ? <KnockoutMatchCard match={match} isFinal={isFinal} interactive={interactive} exporting={exporting} onPick={onPick} />
+        : null}
+    </div>
   )
 }
 
-export function ScenarioBracket({ matches }: { matches: ScenarioBracketMatch[] }) {
-  const matchMap = new Map(matches.map(match => [match.matchNumber, match]))
+export function ScenarioBracket({
+  resolvedMatches,
+  interactive = true,
+  onPick,
+}: {
+  resolvedMatches: Map<number, ResolvedKnockoutMatch>
+  interactive?: boolean
+  onPick: (matchNumber: number, teamId: number) => void
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  function scrollToEdge(edge: 'start' | 'end') {
+    const node = scrollRef.current
+    if (!node) return
+    node.scrollTo({ left: edge === 'start' ? 0 : node.scrollWidth, behavior: 'smooth' })
+  }
+
+  async function handleExportPng() {
+    const grid = gridRef.current
+    if (!grid || exporting) return
+    setExportError(null)
+    setExporting(true)
+    try {
+      await exportBracketPng(grid, scenarioBracketExportFilename())
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
-    <div className="manual-bracket-wrap">
-      <div className="manual-bracket-note">
-        <span className="local-only-badge">Browser scenario</span>
-        The Round of 32 is fixed by your scores. Later rounds remain open because no knockout winners were selected.
+    <div className="bracket-tree-wrap scenario-bracket-tree">
+      <div className="bracket-toolbar">
+        <p className="bracket-meta">
+          <span className="local-only-badge">Browser scenario</span>
+          Round-of-32 pairings follow your group scores and FIFA Annex C. Click a team in each match to pick who
+          advances — later rounds fill in as you go. Picks stay in this browser only.
+        </p>
+        <div className="bracket-jump">
+          <button type="button" className="button ghost" onClick={() => scrollToEdge('start')}>Round of 32</button>
+          <button type="button" className="button ghost" onClick={() => scrollToEdge('end')}>Final</button>
+          <button
+            type="button"
+            className="button ghost"
+            onClick={() => void handleExportPng()}
+            disabled={exporting}
+          >
+            {exporting ? 'Exporting…' : 'Export PNG'}
+          </button>
+        </div>
       </div>
-      <div className="manual-bracket-scroll">
-        <div className="manual-bracket-columns">
-          <RoundColumn title="Round of 32" slots={R32_SLOTS} matches={matchMap} />
-          <RoundColumn title="Round of 16" slots={R16_SLOTS} />
-          <RoundColumn title="Quarter-finals" slots={QF_SLOTS} />
-          <RoundColumn title="Semi-finals" slots={SF_SLOTS} />
-          <RoundColumn title="Final" slots={[FINAL_SLOT]} />
+      {exportError && <p className="bracket-export-error" role="alert">{exportError}</p>}
+      <div className="bracket-scroll" ref={scrollRef}>
+        <div className="bracket-grid" ref={gridRef}>
+          <div className="bracket-grid-head" style={{ gridColumn: BRACKET_COL.r32 }}>Round of 32</div>
+          <div className="bracket-grid-head" style={{ gridColumn: BRACKET_COL.r16 }}>Round of 16</div>
+          <div className="bracket-grid-head" style={{ gridColumn: BRACKET_COL.qf }}>Quarter-finals</div>
+          <div className="bracket-grid-head" style={{ gridColumn: BRACKET_COL.sf }}>Semi-finals</div>
+          <div className="bracket-grid-head" style={{ gridColumn: BRACKET_COL.final }}>Final</div>
+
+          {R32_SLOTS.map(slot => (
+            <MatchCell key={slot.match} slot={slot} column={BRACKET_COL.r32} matchMap={resolvedMatches} interactive={interactive} exporting={exporting} onPick={onPick} />
+          ))}
+          {JOIN_R32_R16.map((join, index) => (
+            <JoinCell key={`j1-${index}`} join={join} column={BRACKET_COL.c1} />
+          ))}
+
+          {R16_SLOTS.map(slot => (
+            <MatchCell key={slot.match} slot={slot} column={BRACKET_COL.r16} matchMap={resolvedMatches} interactive={interactive} exporting={exporting} onPick={onPick} />
+          ))}
+          {JOIN_R16_QF.map((join, index) => (
+            <JoinCell key={`j2-${index}`} join={join} column={BRACKET_COL.c2} />
+          ))}
+
+          {QF_SLOTS.map(slot => (
+            <MatchCell key={slot.match} slot={slot} column={BRACKET_COL.qf} matchMap={resolvedMatches} interactive={interactive} exporting={exporting} onPick={onPick} />
+          ))}
+          {JOIN_QF_SF.map((join, index) => (
+            <JoinCell key={`j3-${index}`} join={join} column={BRACKET_COL.c3} />
+          ))}
+
+          {SF_SLOTS.map(slot => (
+            <MatchCell key={slot.match} slot={slot} column={BRACKET_COL.sf} matchMap={resolvedMatches} interactive={interactive} exporting={exporting} onPick={onPick} />
+          ))}
+          {JOIN_SF_FINAL.map((join, index) => (
+            <JoinCell key={`j4-${index}`} join={join} column={BRACKET_COL.c4} />
+          ))}
+
+          <MatchCell slot={FINAL_SLOT} column={BRACKET_COL.final} matchMap={resolvedMatches} isFinal interactive={interactive} exporting={exporting} onPick={onPick} />
         </div>
       </div>
     </div>

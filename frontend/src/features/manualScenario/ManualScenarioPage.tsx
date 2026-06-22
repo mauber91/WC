@@ -4,8 +4,12 @@ import { api } from '../../api/client'
 import { flagEmoji } from '../../lib/flags'
 import { ScenarioBracket } from './ScenarioBracket'
 import {
+  applyKnockoutPick,
   calculateScenario,
   isCompleteScore,
+  resolveKnockoutBracket,
+  sanitizeKnockoutPicks,
+  type KnockoutPicks,
   type ManualScores,
   type ScenarioGroup,
   type ScenarioMatch,
@@ -14,7 +18,9 @@ import {
 import {
   clearScenarioScores,
   downloadScenarioScores,
+  loadKnockoutPicks,
   loadScenarioScores,
+  saveKnockoutPicks,
   saveScenarioScores,
 } from './scenarioStorage'
 
@@ -172,16 +178,40 @@ export function ManualScenarioPage({
   const groups = useQuery<ScenarioGroup[]>({ queryKey: ['groups'], queryFn: () => api('/groups') })
   const matches = useQuery<ScenarioMatch[]>({ queryKey: ['matches'], queryFn: () => api('/matches') })
   const [scores, setScores] = useState<ManualScores>(() => fixedScores ?? loadScenarioScores())
+  const [knockoutPicks, setKnockoutPicks] = useState<KnockoutPicks>(() => loadKnockoutPicks())
 
   useEffect(() => {
     if (readOnly || fixedScores) return
     saveScenarioScores(scores)
   }, [scores, readOnly, fixedScores])
 
+  useEffect(() => {
+    if (readOnly) return
+    saveKnockoutPicks(knockoutPicks)
+  }, [knockoutPicks, readOnly])
+
   const outcome = useMemo(() => {
     if (!groups.data || !matches.data) return null
     return calculateScenario(groups.data, matches.data, scores)
   }, [groups.data, matches.data, scores])
+
+  const sanitizedKnockoutPicks = useMemo(() => {
+    if (!outcome?.bracket) return {}
+    return sanitizeKnockoutPicks(outcome.bracket, knockoutPicks)
+  }, [outcome?.bracket, knockoutPicks])
+
+  const resolvedKnockout = useMemo(() => {
+    if (!outcome?.bracket) return null
+    return resolveKnockoutBracket(outcome.bracket, sanitizedKnockoutPicks)
+  }, [outcome?.bracket, sanitizedKnockoutPicks])
+
+  useEffect(() => {
+    if (!outcome?.bracket) return
+    setKnockoutPicks(current => {
+      const sanitized = sanitizeKnockoutPicks(outcome.bracket!, current)
+      return JSON.stringify(sanitized) === JSON.stringify(current) ? current : sanitized
+    })
+  }, [outcome?.bracket])
 
   const remainingByGroup = useMemo(() => {
     const output = new Map<string, ScenarioMatch[]>()
@@ -210,6 +240,12 @@ export function ManualScenarioPage({
   function clearAll() {
     clearScenarioScores()
     setScores({})
+    setKnockoutPicks({})
+  }
+
+  function handleKnockoutPick(matchNumber: number, teamId: number) {
+    if (readOnly || !outcome?.bracket) return
+    setKnockoutPicks(current => applyKnockoutPick(outcome.bracket!, current, matchNumber, teamId))
   }
 
   function fillEmptyDraws() {
@@ -278,8 +314,12 @@ export function ManualScenarioPage({
 
         <section className="card scenario-bracket-card">
           <div className="card-head"><div><span className="eyebrow">Official slot assignment</span><h2>Knockout bracket</h2></div><span className="meta">FIFA Annex C</span></div>
-          {outcome.bracket
-            ? <ScenarioBracket matches={outcome.bracket} />
+          {outcome.bracket && resolvedKnockout
+            ? <ScenarioBracket
+                resolvedMatches={resolvedKnockout}
+                interactive={!readOnly}
+                onPick={handleKnockoutPick}
+              />
             : <div className="scenario-bracket-locked"><strong>{outcome.totalRemaining - outcome.enteredCount} scores to go</strong><p>The bracket appears after every remaining group fixture has both scores.</p>{!readOnly && <a href="#scenario-group-A" className="button primary">Continue entering results</a>}</div>}
         </section>
       </>}

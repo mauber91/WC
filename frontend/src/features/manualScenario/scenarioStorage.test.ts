@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   clearScenarioScores,
+  loadKnockoutPicks,
   loadScenarioScores,
+  saveKnockoutPicks,
   saveScenarioScores,
   SCENARIO_STORAGE_KEY,
 } from './scenarioStorage'
@@ -24,6 +26,13 @@ describe('manual scenario local storage', () => {
     expect(loadScenarioScores(storage)).toEqual(scores)
     clearScenarioScores(storage)
     expect(loadScenarioScores(storage)).toEqual({})
+    expect(loadKnockoutPicks(storage)).toEqual({})
+  })
+
+  it('round trips knockout picks', () => {
+    const storage = fakeStorage()
+    saveKnockoutPicks({ '73': 12, '89': 5 }, storage)
+    expect(loadKnockoutPicks(storage)).toEqual({ '73': 12, '89': 5 })
   })
 
   it('rejects malformed or out-of-range entries', () => {

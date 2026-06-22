@@ -36,8 +36,8 @@ match_number,group_code,team_a_fifa_code,team_b_fifa_code,scheduled_at,venue,hos
 35,F,NED,SWE,2026-06-20T17:00:00Z,NRG Stadium,US,final
 36,F,TUN,JPN,2026-06-21T04:00:00Z,Estadio BBVA,MX,final
 37,H,URU,CPV,2026-06-21T22:00:00Z,Hard Rock Stadium,US,scheduled
-38,H,ESP,KSA,2026-06-21T16:00:00Z,Mercedes-Benz Stadium,US,scheduled
-39,G,BEL,IRN,2026-06-21T19:00:00Z,SoFi Stadium,US,scheduled
+38,H,ESP,KSA,2026-06-21T16:00:00Z,Mercedes-Benz Stadium,US,final
+39,G,BEL,IRN,2026-06-21T19:00:00Z,SoFi Stadium,US,final
 40,G,NZL,EGY,2026-06-22T01:00:00Z,BC Place,CA,scheduled
 41,I,NOR,SEN,2026-06-23T00:00:00Z,MetLife Stadium,US,scheduled
 42,I,FRA,IRQ,2026-06-22T21:00:00Z,Lincoln Financial Field,US,scheduled

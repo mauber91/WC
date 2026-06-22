@@ -50,3 +50,8 @@ export function bracketExportFilename(simulationId?: string): string {
   const suffix = simulationId ? `-${simulationId.slice(0, 8)}` : ''
   return `world-cup-bracket-${stamp}${suffix}.png`
 }
+
+export function scenarioBracketExportFilename(): string {
+  const stamp = new Date().toISOString().slice(0, 10)
+  return `your-bracket-${stamp}.png`
+}

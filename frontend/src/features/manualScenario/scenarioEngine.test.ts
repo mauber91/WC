@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   annexCombinationCount,
+  applyKnockoutPick,
   calculateScenario,
+  resolveKnockoutBracket,
+  sanitizeKnockoutPicks,
   type ScenarioGroup,
   type ScenarioMatch,
   type ScenarioTeam,
@@ -93,5 +96,29 @@ describe('manual scenario bracket', () => {
     )).toBe(true)
     expect(new Set(outcome.bracket?.map(row => row.matchNumber))).toEqual(new Set(Array.from({ length: 16 }, (_, index) => 73 + index)))
     expect(outcome.bracket?.every(row => row.teamA.id !== row.teamB.id)).toBe(true)
+  })
+})
+
+describe('knockout picks', () => {
+  it('propagates winners through the bracket', () => {
+    const bracket = [
+      { matchNumber: 73, teamA: team(1, 'A1'), teamB: team(2, 'B2'), sourceA: 'A', sourceB: 'B' },
+      { matchNumber: 75, teamA: team(3, 'F1'), teamB: team(4, 'C2'), sourceA: 'F', sourceB: 'C' },
+    ]
+    const picks = sanitizeKnockoutPicks(bracket, { '73': 1, '75': 3 })
+    const resolved = resolveKnockoutBracket(bracket, picks)
+    expect(resolved.get(73)?.winnerId).toBe(1)
+    expect(resolved.get(90)?.teamA?.id).toBe(1)
+    expect(resolved.get(90)?.teamB?.id).toBe(3)
+  })
+
+  it('clears downstream picks when an upstream winner changes', () => {
+    const bracket = [
+      { matchNumber: 73, teamA: team(1, 'A1'), teamB: team(2, 'B2'), sourceA: 'A', sourceB: 'B' },
+      { matchNumber: 75, teamA: team(3, 'F1'), teamB: team(4, 'C2'), sourceA: 'F', sourceB: 'C' },
+    ]
+    const initial = applyKnockoutPick(bracket, { '73': 1, '75': 3, '90': 1 }, 73, 2)
+    expect(initial['73']).toBe(2)
+    expect(initial['90']).toBeUndefined()
   })
 })

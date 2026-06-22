@@ -1,6 +1,7 @@
 import annexCsv from '../../data/annex_c.csv?raw'
 import ratingsCsv from '../../data/ratings.csv?raw'
 import resultsCsv from '../../data/results.csv?raw'
+import { BRACKET_MATCH_ORDER, KNOCKOUT_FEEDERS } from '../../lib/bracketPath'
 
 export type ScenarioTeam = {
   id: number
@@ -67,6 +68,18 @@ export type ScenarioBracketMatch = {
   teamB: ScenarioTeam
   sourceA: string
   sourceB: string
+}
+
+export type KnockoutPicks = Record<string, number>
+
+export type ResolvedKnockoutMatch = {
+  matchNumber: number
+  teamA: ScenarioTeam | null
+  teamB: ScenarioTeam | null
+  winnerId: number | null
+  sourceA?: string
+  sourceB?: string
+  pendingFeeders?: number[]
 }
 
 export type ScenarioOutcome = {
@@ -428,4 +441,124 @@ export function calculateScenario(
 
 export function annexCombinationCount(): number {
   return THIRD_PLACE_ASSIGNMENTS.size
+}
+
+export function resolveKnockoutBracket(
+  r32Matches: ScenarioBracketMatch[],
+  picks: KnockoutPicks,
+): Map<number, ResolvedKnockoutMatch> {
+  const r32Map = new Map(r32Matches.map(match => [match.matchNumber, match]))
+  const teamsById = new Map<number, ScenarioTeam>()
+  for (const match of r32Matches) {
+    teamsById.set(match.teamA.id, match.teamA)
+    teamsById.set(match.teamB.id, match.teamB)
+  }
+
+  const winners = new Map<number, number>()
+  const output = new Map<number, ResolvedKnockoutMatch>()
+
+  for (const matchNumber of BRACKET_MATCH_ORDER) {
+    const feeders = KNOCKOUT_FEEDERS[matchNumber]
+    let teamA: ScenarioTeam | null = null
+    let teamB: ScenarioTeam | null = null
+    let sourceA: string | undefined
+    let sourceB: string | undefined
+    const pendingFeeders: number[] = []
+
+    if (!feeders) {
+      const r32 = r32Map.get(matchNumber)
+      if (!r32) continue
+      teamA = r32.teamA
+      teamB = r32.teamB
+      sourceA = r32.sourceA
+      sourceB = r32.sourceB
+    } else {
+      const winnerA = winners.get(feeders[0])
+      const winnerB = winners.get(feeders[1])
+      if (winnerA == null) pendingFeeders.push(feeders[0])
+      else teamA = teamsById.get(winnerA) ?? null
+      if (winnerB == null) pendingFeeders.push(feeders[1])
+      else teamB = teamsById.get(winnerB) ?? null
+    }
+
+    const pick = picks[String(matchNumber)] ?? null
+    let winnerId: number | null = null
+    if (teamA && teamB && pick != null && (pick === teamA.id || pick === teamB.id)) {
+      winnerId = pick
+      winners.set(matchNumber, pick)
+    }
+
+    output.set(matchNumber, {
+      matchNumber,
+      teamA,
+      teamB,
+      winnerId,
+      sourceA,
+      sourceB,
+      pendingFeeders: pendingFeeders.length ? pendingFeeders : undefined,
+    })
+  }
+
+  return output
+}
+
+export function sanitizeKnockoutPicks(
+  r32Matches: ScenarioBracketMatch[],
+  picks: KnockoutPicks,
+): KnockoutPicks {
+  const clean: KnockoutPicks = {}
+  const winners = new Map<number, number>()
+  const r32Map = new Map(r32Matches.map(match => [match.matchNumber, match]))
+  const teamsById = new Map<number, ScenarioTeam>()
+  for (const match of r32Matches) {
+    teamsById.set(match.teamA.id, match.teamA)
+    teamsById.set(match.teamB.id, match.teamB)
+  }
+
+  for (const matchNumber of BRACKET_MATCH_ORDER) {
+    const feeders = KNOCKOUT_FEEDERS[matchNumber]
+    let teamA: ScenarioTeam | null = null
+    let teamB: ScenarioTeam | null = null
+
+    if (!feeders) {
+      const r32 = r32Map.get(matchNumber)
+      if (!r32) continue
+      teamA = r32.teamA
+      teamB = r32.teamB
+    } else {
+      const winnerA = winners.get(feeders[0])
+      const winnerB = winners.get(feeders[1])
+      if (winnerA == null || winnerB == null) continue
+      teamA = teamsById.get(winnerA) ?? null
+      teamB = teamsById.get(winnerB) ?? null
+      if (!teamA || !teamB) continue
+    }
+
+    const pick = picks[String(matchNumber)]
+    if (pick == null) continue
+    if (pick !== teamA.id && pick !== teamB.id) continue
+    clean[String(matchNumber)] = pick
+    winners.set(matchNumber, pick)
+  }
+
+  return clean
+}
+
+export function applyKnockoutPick(
+  r32Matches: ScenarioBracketMatch[],
+  picks: KnockoutPicks,
+  matchNumber: number,
+  teamId: number,
+): KnockoutPicks {
+  const resolved = resolveKnockoutBracket(r32Matches, picks)
+  const match = resolved.get(matchNumber)
+  if (!match?.teamA || !match?.teamB) return picks
+  if (teamId !== match.teamA.id && teamId !== match.teamB.id) return picks
+
+  const key = String(matchNumber)
+  const next = { ...picks }
+  if (next[key] === teamId) delete next[key]
+  else next[key] = teamId
+
+  return sanitizeKnockoutPicks(r32Matches, next)
 }

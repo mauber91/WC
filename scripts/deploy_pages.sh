@@ -86,8 +86,18 @@ source "$FRONTEND_ENV"
 set +a
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
-  echo "==> Building frontend"
+  echo "==> Building frontend (published mode)"
   (cd frontend && npm ci && npm run build)
+else
+  echo "==> Skipping frontend build (--skip-build)"
+  if ! rg -q "Published forecast" frontend/dist/assets/*.js 2>/dev/null; then
+    echo "ERROR: frontend/dist was not built in published mode. Re-run without --skip-build." >&2
+    exit 1
+  fi
+  if rg -q '"/admin/data"|Admin workspace' frontend/dist/assets/*.js 2>/dev/null; then
+    echo "ERROR: frontend/dist contains admin routes. Re-run without --skip-build." >&2
+    exit 1
+  fi
 fi
 
 if [[ ! -d "$ROOT/frontend/dist" ]]; then

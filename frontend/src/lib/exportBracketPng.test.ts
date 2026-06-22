@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { bracketExportFilename } from './exportBracketPng'
+import { bracketExportFilename, scenarioBracketExportFilename } from './exportBracketPng'
 
 describe('bracketExportFilename', () => {
   it('includes date and simulation id prefix', () => {
@@ -10,5 +10,11 @@ describe('bracketExportFilename', () => {
 
   it('works without simulation id', () => {
     expect(bracketExportFilename()).toMatch(/^world-cup-bracket-\d{4}-\d{2}-\d{2}\.png$/)
+  })
+})
+
+describe('scenarioBracketExportFilename', () => {
+  it('uses a dated your-bracket prefix', () => {
+    expect(scenarioBracketExportFilename()).toMatch(/^your-bracket-\d{4}-\d{2}-\d{2}\.png$/)
   })
 })
