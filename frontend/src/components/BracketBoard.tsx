@@ -4,6 +4,7 @@ import { bracketExportFilename, exportBracketPng } from '../lib/exportBracketPng
 import { flagEmoji } from '../lib/flags'
 import { formatSimulationCoverage, type SimulationResultCoverage } from '../lib/simulationCoverage'
 import { buildCoherentMatchMap, buildR32SlotLeaderboards, type BracketMatch, type BracketRow, type R32MatchSlotLeaders } from '../lib/bracketPath'
+import { KNOCKOUT_SCHEDULE } from '../lib/knockoutSchedule'
 import {
   BRACKET_COL as COL,
   FINAL_SLOT,
@@ -23,17 +24,6 @@ import {
 export type { BracketRow }
 
 type Team = { id: number; fifa_code: string; name: string; country_code?: string }
-
-const KNOCKOUT_SCHEDULE: Record<number, string> = {
-  73: '2026-06-28T17:00:00Z', 74: '2026-06-29T19:00:00Z', 75: '2026-06-29T14:00:00Z', 76: '2026-06-29T22:00:00Z',
-  77: '2026-06-30T17:00:00Z', 78: '2026-06-30T20:00:00Z', 79: '2026-07-01T15:00:00Z', 80: '2026-07-01T21:00:00Z',
-  81: '2026-07-02T17:00:00Z', 82: '2026-07-02T20:00:00Z', 83: '2026-07-02T23:00:00Z', 84: '2026-07-03T14:00:00Z',
-  85: '2026-07-03T17:00:00Z', 86: '2026-07-03T20:00:00Z', 87: '2026-07-04T02:00:00Z', 88: '2026-07-04T17:00:00Z',
-  89: '2026-07-04T20:00:00Z', 90: '2026-07-05T17:00:00Z', 91: '2026-07-05T21:00:00Z', 92: '2026-07-06T19:00:00Z',
-  93: '2026-07-06T23:00:00Z', 94: '2026-07-07T14:00:00Z', 95: '2026-07-07T17:00:00Z', 96: '2026-07-07T20:00:00Z',
-  97: '2026-07-09T20:00:00Z', 98: '2026-07-10T20:00:00Z', 99: '2026-07-11T17:00:00Z', 100: '2026-07-11T21:00:00Z',
-  101: '2026-07-14T19:00:00Z', 102: '2026-07-15T19:00:00Z', 104: '2026-07-19T19:00:00Z',
-}
 
 function formatSchedule(iso: string | null, matchNumber: number) {
   if (!iso) return { day: 'TBD', time: '—', date: `M${matchNumber}` }
