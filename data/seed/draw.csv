@@ -1,0 +1,49 @@
+fifa_code,name,country_code,confederation,group_code,draw_position,is_host
+MEX,Mexico,MX,CONCACAF,A,1,true
+RSA,South Africa,ZA,CAF,A,2,false
+KOR,Korea Republic,KR,AFC,A,3,false
+CZE,Czechia,CZ,UEFA,A,4,false
+CAN,Canada,CA,CONCACAF,B,1,true
+SUI,Switzerland,CH,UEFA,B,2,false
+QAT,Qatar,QA,AFC,B,3,false
+BIH,Bosnia and Herzegovina,BA,UEFA,B,4,false
+BRA,Brazil,BR,CONMEBOL,C,1,false
+MAR,Morocco,MA,CAF,C,2,false
+HAI,Haiti,HT,CONCACAF,C,3,false
+SCO,Scotland,GB,UEFA,C,4,false
+USA,United States,US,CONCACAF,D,1,true
+PAR,Paraguay,PY,CONMEBOL,D,2,false
+AUS,Australia,AU,AFC,D,3,false
+TUR,Türkiye,TR,UEFA,D,4,false
+GER,Germany,DE,UEFA,E,1,false
+CUW,Curaçao,CW,CONCACAF,E,2,false
+CIV,Côte d'Ivoire,CI,CAF,E,3,false
+ECU,Ecuador,EC,CONMEBOL,E,4,false
+NED,Netherlands,NL,UEFA,F,1,false
+JPN,Japan,JP,AFC,F,2,false
+TUN,Tunisia,TN,CAF,F,3,false
+SWE,Sweden,SE,UEFA,F,4,false
+BEL,Belgium,BE,UEFA,G,1,false
+EGY,Egypt,EG,CAF,G,2,false
+IRN,IR Iran,IR,AFC,G,3,false
+NZL,New Zealand,NZ,OFC,G,4,false
+ESP,Spain,ES,UEFA,H,1,false
+CPV,Cabo Verde,CV,CAF,H,2,false
+KSA,Saudi Arabia,SA,AFC,H,3,false
+URU,Uruguay,UY,CONMEBOL,H,4,false
+FRA,France,FR,UEFA,I,1,false
+SEN,Senegal,SN,CAF,I,2,false
+NOR,Norway,NO,UEFA,I,3,false
+IRQ,Iraq,IQ,AFC,I,4,false
+ARG,Argentina,AR,CONMEBOL,J,1,false
+ALG,Algeria,DZ,CAF,J,2,false
+AUT,Austria,AT,UEFA,J,3,false
+JOR,Jordan,JO,AFC,J,4,false
+POR,Portugal,PT,UEFA,K,1,false
+UZB,Uzbekistan,UZ,AFC,K,2,false
+COL,Colombia,CO,CONMEBOL,K,3,false
+COD,Congo DR,CD,CAF,K,4,false
+ENG,England,GB,UEFA,L,1,false
+CRO,Croatia,HR,UEFA,L,2,false
+GHA,Ghana,GH,CAF,L,3,false
+PAN,Panama,PA,CONCACAF,L,4,false

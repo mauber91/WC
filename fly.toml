@@ -1,0 +1,41 @@
+# Rename `app` before first deploy: fly apps create <your-app-name>
+app = "wc-forecast-api"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  WC_DATABASE_URL = "sqlite:////data/app/worldcup.db"
+  WC_SIMULATIONS_ENABLED = "false"
+  WC_ENABLE_SCHEDULER = "true"
+  WC_MARKET_SYNC_ENABLED = "true"
+  WC_MARKET_SYNC_ON_STARTUP = "true"
+  WC_SEED_REFRESH_ENABLED = "true"
+  WC_SEED_REFRESH_ON_STARTUP = "false"
+  WC_SEED_REGENERATE_CSVS = "false"
+  WC_SIMULATION_MAX_WORKERS = "1"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/v1/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[mounts]
+  source = "wc_data"
+  destination = "/data"
