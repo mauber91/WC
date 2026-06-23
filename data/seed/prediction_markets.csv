@@ -1,13 +1,4 @@
 platform,external_market_id,contract_id,market_type,selection,yes_price,snapshot_at,match_number,best_bid,best_ask,volume
-kalshi-model-bridge,fwc2026-m41,41-team_a,1X2,team_a,0.4057,2026-06-20T14:30:00Z,41,0.3857,0.4257,25000
-kalshi-model-bridge,fwc2026-m41,41-draw,1X2,draw,0.2604,2026-06-20T14:30:00Z,41,0.2404,0.2804,25000
-kalshi-model-bridge,fwc2026-m41,41-team_b,1X2,team_b,0.3339,2026-06-20T14:30:00Z,41,0.3139,0.3539,25000
-kalshi-model-bridge,fwc2026-m42,42-team_a,1X2,team_a,0.7696,2026-06-20T14:30:00Z,42,0.7496,0.7896,25000
-kalshi-model-bridge,fwc2026-m42,42-draw,1X2,draw,0.1486,2026-06-20T14:30:00Z,42,0.1286,0.1686,25000
-kalshi-model-bridge,fwc2026-m42,42-team_b,1X2,team_b,0.0818,2026-06-20T14:30:00Z,42,0.0618,0.1018,25000
-kalshi-model-bridge,fwc2026-m43,43-team_a,1X2,team_a,0.6181,2026-06-20T14:30:00Z,43,0.5981,0.6381,25000
-kalshi-model-bridge,fwc2026-m43,43-draw,1X2,draw,0.2144,2026-06-20T14:30:00Z,43,0.1944,0.2344,25000
-kalshi-model-bridge,fwc2026-m43,43-team_b,1X2,team_b,0.1675,2026-06-20T14:30:00Z,43,0.1475,0.1875,25000
 kalshi-model-bridge,fwc2026-m44,44-team_a,1X2,team_a,0.2268,2026-06-20T14:30:00Z,44,0.2068,0.2468,25000
 kalshi-model-bridge,fwc2026-m44,44-draw,1X2,draw,0.2399,2026-06-20T14:30:00Z,44,0.2199,0.2599,25000
 kalshi-model-bridge,fwc2026-m44,44-team_b,1X2,team_b,0.5332,2026-06-20T14:30:00Z,44,0.5132,0.5532,25000
