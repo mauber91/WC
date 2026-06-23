@@ -209,7 +209,7 @@ export function BracketBoard({
   iterations: number
   simulationId?: string
   resultCoverage?: SimulationResultCoverage
-  groups?: Array<{ id: number; code: string; teams: Array<{ id: number; fifa_code: string; name: string }> }>
+  groups?: Array<{ id: number; code: string; display_name: string; teams: Array<{ id: number; fifa_code: string; name: string }> }>
   simulationGroups?: SimulationGroupOutcome[]
   teamExpectations?: TeamGroupStats[]
 }) {
