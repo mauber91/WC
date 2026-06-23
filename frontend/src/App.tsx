@@ -4,6 +4,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, percent } from './api/client'
 import { BracketBoard, type BracketRow } from './components/BracketBoard'
+import type { SimulationGroupOutcome } from './features/manualScenario/scenarioEngine'
 import { TeamPageView } from './components/TeamPage'
 import { isPublishedMode } from './config/appMode'
 import { ManualScenarioPage } from './features/manualScenario/ManualScenarioPage'
@@ -18,7 +19,7 @@ type Group = { id: number; code: string; display_name: string; teams: Team[] }
 type Standing = { position: number; team_id: number; name: string; played: number; won: number; drawn: number; lost: number; goals_for: number; goals_against: number; goal_difference: number; points: number }
 type Match = { id: number; official_match_number: number; group_code: string; team_a: Team; team_b: Team; scheduled_at: string; status: string; result?: { team_a_goals: number; team_b_goals: number; revision: number } }
 type Run = SimulationRun
-type TeamForecast = { team_id: number; name: string; fifa_code: string; win_group: number; finish_1: number; finish_2: number; finish_3: number; finish_4: number; top_two: number; advance_as_third: number; round_of_32: number; round_of_16: number; quarterfinal: number; semifinal: number; final: number; champion: number; eliminated: number; expected_group_points: number; expected_group_goals_for: number; expected_group_goals_against: number }
+type TeamForecast = { team_id: number; name: string; fifa_code: string; win_group: number; finish_1: number; finish_2: number; finish_3: number; finish_4: number; top_two: number; advance_as_third: number; round_of_32: number; round_of_16: number; quarterfinal: number; semifinal: number; final: number; champion: number; eliminated: number; expected_group_points: number; expected_group_goals_for: number; expected_group_goals_against: number; r32_rivals?: { as_winner: Array<{ team_id: number; name: string; fifa_code: string; probability: number }>; as_runner_up: Array<{ team_id: number; name: string; fifa_code: string; probability: number }>; as_third: Array<{ team_id: number; name: string; fifa_code: string; probability: number }> } }
 type Projection = { teams: TeamForecast[] }
 type Triple = { team_a: number; draw: number; team_b: number }
 type MatchPrediction = { data_quality: string; lambda_a: number; lambda_b: number; final: Triple; model: Triple; market: Triple | null; score_distribution: number[][] }
@@ -282,28 +283,42 @@ function SimulatorPage() {
 function BracketPage() {
   const { data: latest } = useLatestSimulation()
   const teams = useQuery<Team[]>({ queryKey: ['teams'], queryFn: () => api('/teams') })
+  const groups = useQuery<Group[]>({ queryKey: ['groups'], queryFn: () => api('/groups') })
   const bracket = useQuery<BracketRow[]>({
     queryKey: ['bracket', latest?.id],
     queryFn: () => api(`/simulations/${latest!.id}/bracket`),
+    enabled: !!latest,
+  })
+  const simulationGroups = useQuery<SimulationGroupOutcome[]>({
+    queryKey: ['sim-groups', latest?.id],
+    queryFn: () => api(`/simulations/${latest!.id}/groups`),
+    enabled: !!latest,
+  })
+  const teamExpectations = useQuery<TeamForecast[]>({
+    queryKey: ['sim-teams', latest?.id],
+    queryFn: () => api(`/simulations/${latest!.id}/teams`),
     enabled: !!latest,
   })
   return <>
     <PageHeader
       eyebrow="Path distribution"
       title="Projected bracket"
-      detail="Tournament tree with the most likely matchup in each slot and conditional advance probabilities from your latest simulation."
+      detail="Knockout tree built from the most likely group-stage outcome in each group, official slot rules, and conditional advance rates from your latest simulation."
     />
     {!latest && <Empty text={isPublishedMode ? 'Published forecast is not available yet.' : 'Complete a simulation to build matchup probabilities.'} />}
-    {latest && teams.data && bracket.data && (
+    {latest && teams.data && bracket.data && groups.data && simulationGroups.data && teamExpectations.data && (
       <BracketBoard
         rows={bracket.data}
         teams={teams.data}
         iterations={latest.iterations}
         simulationId={latest.id}
         resultCoverage={latest.result_coverage}
+        groups={groups.data}
+        simulationGroups={simulationGroups.data}
+        teamExpectations={teamExpectations.data}
       />
     )}
-    {latest && (!teams.data || !bracket.data) && <Loading />}
+    {latest && (!teams.data || !bracket.data || !groups.data || !simulationGroups.data || !teamExpectations.data) && <Loading />}
   </>
 }
 
@@ -330,7 +345,7 @@ function TeamPage() {
   const { slug } = useParams()
   const { data: latest } = useLatestSimulation()
   if (!slug) return null
-  return <TeamPageView slug={slug} latestSimulationId={latest?.id} />
+  return <TeamPageView slug={slug} latestSimulationId={latest?.id} simulationIterations={latest?.iterations} />
 }
 
 function AdminPage() {

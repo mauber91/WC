@@ -11,7 +11,7 @@ from world_cup_api.api.schemas import ResultInput, SimulationInput, SimulationSt
 from world_cup_api.config import Settings, get_settings
 from world_cup_api.db.models import (
     BookmakerOdds, Group, PredictionMarketPrice, Simulation, SimulationBracketResult,
-    SimulationGroupResult, SimulationTeamResult, Team, TournamentTeam, IngestionRun,
+    SimulationGroupResult, SimulationTeamR32Rival, SimulationTeamResult, Team, TournamentTeam, IngestionRun,
 )
 from world_cup_api.db.session import get_db
 from world_cup_api.jobs.scheduler import schedule_simulation
@@ -62,7 +62,9 @@ def team_forecast_route(team_ref: str, simulation_id: str, db: Session = Depends
     row = db.get(SimulationTeamResult, (simulation_id, team.id))
     if not row:
         raise HTTPException(404, "Team forecast not found")
-    return _team_probability(row, run)
+    payload = _team_probability(row, run)
+    payload["r32_rivals"] = _team_r32_rivals(db, simulation_id, team.id, row)
+    return payload
 
 
 @router.get("/groups")
@@ -385,3 +387,53 @@ def _team_probability(row: SimulationTeamResult, run: Simulation) -> dict:
             "expected_group_points": row.sum_group_points / n,
             "expected_group_goals_for": row.sum_group_goals_for / n,
             "expected_group_goals_against": row.sum_group_goals_against / n}
+
+
+def _team_r32_rivals(
+    db: Session,
+    simulation_id: str,
+    team_id: int,
+    row: SimulationTeamResult,
+    *,
+    limit: int = 5,
+) -> dict[str, list[dict]]:
+    rivals = db.scalars(select(SimulationTeamR32Rival).where(
+        SimulationTeamR32Rival.simulation_id == simulation_id,
+        SimulationTeamR32Rival.team_id == team_id,
+    ).order_by(
+        SimulationTeamR32Rival.finish_position,
+        SimulationTeamR32Rival.meeting_count.desc(),
+    )).all()
+    if not rivals:
+        return {"as_winner": [], "as_runner_up": [], "as_third": []}
+
+    opponent_ids = {rival.opponent_team_id for rival in rivals}
+    opponents = {
+        team.id: team
+        for team in db.scalars(select(Team).where(Team.id.in_(opponent_ids))).all()
+    }
+    denominators = {
+        1: max(row.finish_1_count, 1),
+        2: max(row.finish_2_count, 1),
+        3: max(row.finish_3_count, 1),
+    }
+    labels = {1: "as_winner", 2: "as_runner_up", 3: "as_third"}
+    grouped: dict[str, list[dict]] = {label: [] for label in labels.values()}
+
+    for position, label in labels.items():
+        position_rows = sorted(
+            (rival for rival in rivals if rival.finish_position == position),
+            key=lambda rival: rival.meeting_count,
+            reverse=True,
+        )
+        for rival in position_rows[:limit]:
+            opponent = opponents.get(rival.opponent_team_id)
+            if opponent is None:
+                continue
+            grouped[label].append({
+                "team_id": opponent.id,
+                "name": opponent.name,
+                "fifa_code": opponent.fifa_code,
+                "probability": rival.meeting_count / denominators[position],
+            })
+    return grouped

@@ -3,8 +3,9 @@ import { percent } from '../api/client'
 import { bracketExportFilename, exportBracketPng } from '../lib/exportBracketPng'
 import { flagEmoji } from '../lib/flags'
 import { formatSimulationCoverage, type SimulationResultCoverage } from '../lib/simulationCoverage'
-import { buildCoherentMatchMap, buildR32SlotLeaderboards, type BracketMatch, type BracketRow, type R32MatchSlotLeaders } from '../lib/bracketPath'
+import { buildCoherentMatchMap, buildR32SlotLeaderboards, type BracketMatch, type BracketRow, type PredictedR32Pairing, type R32MatchSlotLeaders } from '../lib/bracketPath'
 import { KNOCKOUT_SCHEDULE } from '../lib/knockoutSchedule'
+import { buildPredictedRoundOf32, type SimulationGroupOutcome, type TeamGroupStats } from '../features/manualScenario/scenarioEngine'
 import {
   BRACKET_COL as COL,
   FINAL_SLOT,
@@ -35,12 +36,16 @@ function formatSchedule(iso: string | null, matchNumber: number) {
   }
 }
 
-function buildMatchMap(rows: BracketRow[], teams: Team[]): Map<number, BracketMatch> {
+function buildMatchMap(
+  rows: BracketRow[],
+  teams: Team[],
+  predictedR32?: Map<number, PredictedR32Pairing>,
+): Map<number, BracketMatch> {
   const normalized = teams.map(team => ({
     ...team,
     country_code: team.country_code ?? '',
   }))
-  return buildCoherentMatchMap(rows, normalized, KNOCKOUT_SCHEDULE)
+  return buildCoherentMatchMap(rows, normalized, KNOCKOUT_SCHEDULE, predictedR32)
 }
 
 function rowStyle(row: number, span: number): CSSProperties {
@@ -195,18 +200,30 @@ export function BracketBoard({
   iterations,
   simulationId,
   resultCoverage,
+  groups,
+  simulationGroups,
+  teamExpectations,
 }: {
   rows: BracketRow[]
   teams: Team[]
   iterations: number
   simulationId?: string
   resultCoverage?: SimulationResultCoverage
+  groups?: Array<{ id: number; code: string; teams: Array<{ id: number; fifa_code: string; name: string }> }>
+  simulationGroups?: SimulationGroupOutcome[]
+  teamExpectations?: TeamGroupStats[]
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
-  const matchMap = useMemo(() => buildMatchMap(rows, teams), [rows, teams])
+  const predictedR32 = useMemo(() => {
+    if (!groups || !simulationGroups || !teamExpectations) return undefined
+    const bracket = buildPredictedRoundOf32(groups, simulationGroups, teamExpectations)
+    if (!bracket) return undefined
+    return new Map(bracket.map(match => [match.matchNumber, { teamAId: match.teamA.id, teamBId: match.teamB.id }]))
+  }, [groups, simulationGroups, teamExpectations])
+  const matchMap = useMemo(() => buildMatchMap(rows, teams, predictedR32), [rows, teams, predictedR32])
   const r32SlotLeaders = useMemo(() => buildR32SlotLeaderboards(rows, iterations), [rows, iterations])
 
   function scrollToEdge(edge: 'start' | 'end') {
@@ -240,8 +257,9 @@ export function BracketBoard({
       )}
       <div className="bracket-toolbar">
         <p className="bracket-meta">
-          One projected path through the bracket from {iterations.toLocaleString()} simulations.
-          Each match shows the favored winner from the round before; percentages are sim win rates for that pairing.
+          One projected knockout path from {iterations.toLocaleString()} simulations: the most likely group-stage
+          finish in each group, then the official Round-of-32 slot rules (including third-place assignments).
+          Later rounds follow favored winners from the prior round; percentages are sim win rates for that pairing.
           Hover a Round-of-32 match to see the top 3 teams for each side of that slot.
           <span className="bracket-meta-home"> H = venue home boost (MX/US/CA playing in their host country).</span>
         </p>

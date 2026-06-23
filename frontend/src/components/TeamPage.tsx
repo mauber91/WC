@@ -3,6 +3,7 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { NavLink } from 'react-router-dom'
 import { api, percent } from '../api/client'
 import { flagEmoji } from '../lib/flags'
+import { teamPath } from '../lib/teamSlug'
 
 export type TeamListItem = {
   id: number
@@ -95,6 +96,18 @@ export type TeamForecast = {
   expected_group_points: number
   expected_group_goals_for: number
   expected_group_goals_against: number
+  r32_rivals?: {
+    as_winner: R32Rival[]
+    as_runner_up: R32Rival[]
+    as_third: R32Rival[]
+  }
+}
+
+export type R32Rival = {
+  team_id: number
+  name: string
+  fifa_code: string
+  probability: number
 }
 
 type MatchPrediction = { final: { team_a: number; draw: number; team_b: number } }
@@ -173,7 +186,74 @@ function SquadRatingBar({ rating }: { rating: number }) {
   )
 }
 
-export function TeamPageView({ slug, latestSimulationId }: { slug: string; latestSimulationId?: string }) {
+function hasR32RivalData(forecast: TeamForecast): boolean {
+  const rivals = forecast.r32_rivals
+  if (!rivals) return false
+  return rivals.as_winner.length > 0 || rivals.as_runner_up.length > 0 || rivals.as_third.length > 0
+}
+
+function R32RivalsSection({ forecast, iterations }: { forecast: TeamForecast; iterations?: number }) {
+  const scenarios = [
+    { key: 'as_winner', label: 'Win group', probability: forecast.finish_1, rivals: forecast.r32_rivals?.as_winner ?? [] },
+    { key: 'as_runner_up', label: 'Finish 2nd', probability: forecast.finish_2, rivals: forecast.r32_rivals?.as_runner_up ?? [] },
+    { key: 'as_third', label: 'Finish 3rd', probability: forecast.finish_3, rivals: forecast.r32_rivals?.as_third ?? [] },
+  ] as const
+
+  if (!hasR32RivalData(forecast)) return null
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <div>
+          <span className="eyebrow">Simulation</span>
+          <h2>Projected Round-of-32 rivals</h2>
+        </div>
+        <span className="meta">
+          {iterations ? `${iterations.toLocaleString()} trials · ` : ''}Conditional on group finish
+        </span>
+      </div>
+      <div className="team-r32-rivals">
+        {scenarios.map(scenario => (
+          <article className="team-r32-scenario" key={scenario.key}>
+            <header className="team-r32-scenario-head">
+              <h3>{scenario.label}</h3>
+              <span className="team-r32-scenario-pct">{percent(scenario.probability)}</span>
+            </header>
+            {scenario.rivals.length > 0 ? (
+              <ol className="team-r32-rival-list">
+                {scenario.rivals.map(rival => (
+                  <li key={rival.team_id}>
+                    <NavLink className="team-link" to={teamPath({ name: rival.name })}>
+                      <span aria-hidden>{flagEmoji(rival.fifa_code)}</span>
+                      {rival.name}
+                    </NavLink>
+                    <strong>{percent(rival.probability, 1)}</strong>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="team-r32-empty">
+                {scenario.key === 'as_third'
+                  ? 'Most 3rd-place finishes do not advance.'
+                  : 'No knockout path in the latest simulation run.'}
+              </p>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+export function TeamPageView({
+  slug,
+  latestSimulationId,
+  simulationIterations,
+}: {
+  slug: string
+  latestSimulationId?: string
+  simulationIterations?: number
+}) {
   const team = useQuery<TeamDetail>({
     queryKey: ['team', slug],
     queryFn: () => api(`/teams/${slug}`),
@@ -315,6 +395,8 @@ export function TeamPageView({ slug, latestSimulationId }: { slug: string; lates
               <span>Expected GF/GA <strong>{forecast.data.expected_group_goals_for.toFixed(2)} / {forecast.data.expected_group_goals_against.toFixed(2)}</strong></span>
             </div>
           </section>
+
+          <R32RivalsSection forecast={forecast.data} iterations={simulationIterations} />
 
           <section className="card">
             <div className="card-head">

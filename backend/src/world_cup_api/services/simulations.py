@@ -8,11 +8,39 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from world_cup_api.db.models import (
-    Simulation, SimulationBracketResult, SimulationGroupResult, SimulationTeamResult, Tournament,
+    Simulation, SimulationBracketResult, SimulationGroupResult, SimulationTeamR32Rival, SimulationTeamResult, Tournament,
 )
 from world_cup_api.db.session import SessionLocal
 from world_cup_api.config import get_settings
 from world_cup_api.simulation.engine import build_input_snapshot, run_trials_parallel
+
+
+def backfill_r32_rivals(db: Session, simulation_id: str) -> int:
+    run = db.get(Simulation, simulation_id)
+    if run is None:
+        raise LookupError(f"Simulation {simulation_id} not found")
+    if run.status != "completed":
+        raise ValueError(f"Simulation {simulation_id} is not completed")
+
+    output = run_trials_parallel(
+        run.input_snapshot_json,
+        run.iterations,
+        run.seed,
+        get_settings().simulation_max_workers,
+    )
+    db.execute(delete(SimulationTeamR32Rival).where(SimulationTeamR32Rival.simulation_id == simulation_id))
+    rows_written = 0
+    for (team_id, finish_position, opponent_id), count in output["r32_rivals"].items():
+        db.add(SimulationTeamR32Rival(
+            simulation_id=simulation_id,
+            team_id=team_id,
+            finish_position=finish_position,
+            opponent_team_id=opponent_id,
+            meeting_count=count,
+        ))
+        rows_written += 1
+    db.commit()
+    return rows_written
 
 
 def create_simulation(db: Session, iterations: int, seed: int, force: bool = False) -> Simulation:
@@ -64,6 +92,7 @@ def execute_simulation(simulation_id: str) -> None:
         db.execute(delete(SimulationTeamResult).where(SimulationTeamResult.simulation_id == simulation_id))
         db.execute(delete(SimulationGroupResult).where(SimulationGroupResult.simulation_id == simulation_id))
         db.execute(delete(SimulationBracketResult).where(SimulationBracketResult.simulation_id == simulation_id))
+        db.execute(delete(SimulationTeamR32Rival).where(SimulationTeamR32Rival.simulation_id == simulation_id))
         for team_id, counts in output["teams"].items():
             db.add(SimulationTeamResult(
                 simulation_id=simulation_id, team_id=team_id,
@@ -84,6 +113,14 @@ def execute_simulation(simulation_id: str) -> None:
             db.add(SimulationBracketResult(simulation_id=simulation_id, official_match_number=number,
                                            team_a_id=team_a, team_b_id=team_b,
                                            meeting_count=counts["meetings"], team_a_advance_count=counts["a_wins"]))
+        for (team_id, finish_position, opponent_id), count in output["r32_rivals"].items():
+            db.add(SimulationTeamR32Rival(
+                simulation_id=simulation_id,
+                team_id=team_id,
+                finish_position=finish_position,
+                opponent_team_id=opponent_id,
+                meeting_count=count,
+            ))
         run.progress_iterations = output["completed"]
         run.status = "cancelled" if run.cancel_requested else "completed"
         run.completed_at = datetime.now(timezone.utc)

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   annexCombinationCount,
   applyKnockoutPick,
+  buildPredictedRoundOf32,
   calculateScenario,
   resolveKnockoutBracket,
   sanitizeKnockoutPicks,
@@ -96,6 +97,47 @@ describe('manual scenario bracket', () => {
     )).toBe(true)
     expect(new Set(outcome.bracket?.map(row => row.matchNumber))).toEqual(new Set(Array.from({ length: 16 }, (_, index) => 73 + index)))
     expect(outcome.bracket?.every(row => row.teamA.id !== row.teamB.id)).toBe(true)
+  })
+
+  it('matches the manual scenario bracket when built from modal group outcomes', () => {
+    const groups: ScenarioGroup[] = []
+    const matches: ScenarioMatch[] = []
+    let teamId = 1
+    let matchNumber = 1
+    for (const groupCode of 'ABCDEFGHIJKL') {
+      const teams = [1, 2, 3, 4].map(position => team(teamId++, `${groupCode}${position}`))
+      groups.push({ id: groups.length + 1, code: groupCode, display_name: `Group ${groupCode}`, teams })
+      const fixtures: Array<[number, number, number, number]> = [
+        [0, 1, 1, 0], [0, 2, 1, 0], [0, 3, 1, 0],
+        [1, 2, 1, 0], [1, 3, 1, 0], [2, 3, 1, 0],
+      ]
+      fixtures.forEach(([a, b, goalsA, goalsB]) => {
+        matches.push(match(matchNumber++, groupCode, teams[a], teams[b], goalsA, goalsB))
+      })
+    }
+    const outcome = calculateScenario(groups, matches, {})
+    const groupOutcomes = groups.map(group => ({
+      group_id: group.id,
+      order: outcome.tables.find(table => table.code === group.code)!.rows.map(row => row.team.id),
+      count: 1,
+      probability: 1,
+    }))
+    const teamStats = outcome.tables
+      .flatMap(table => table.rows)
+      .map(row => ({
+        team_id: row.team.id,
+        expected_group_points: row.points,
+        expected_group_goals_for: row.goalsFor,
+        expected_group_goals_against: row.goalsAgainst,
+      }))
+    const predicted = buildPredictedRoundOf32(groups, groupOutcomes, teamStats)
+    expect(predicted).toHaveLength(16)
+    expect(predicted?.map(row => row.matchNumber)).toEqual(outcome.bracket?.map(row => row.matchNumber))
+    for (const match of predicted ?? []) {
+      const expected = outcome.bracket?.find(row => row.matchNumber === match.matchNumber)
+      expect(match.teamA.id).toBe(expected?.teamA.id)
+      expect(match.teamB.id).toBe(expected?.teamB.id)
+    }
   })
 })
 

@@ -367,6 +367,72 @@ function sourceTeam(
   return { team: row.team, label: `Group ${reference} ${kind}` }
 }
 
+export function resolveRoundOf32Bracket(tables: ScenarioGroupTable[]): ScenarioBracketMatch[] {
+  const rankedThird = rankThirdPlace(tables.map(table => table.rows[2]))
+  return buildRoundOf32(tables, rankedThird.rows)
+}
+
+export type SimulationGroupOutcome = {
+  group_id: number
+  order: number[]
+  count: number
+  probability: number
+}
+
+export type TeamGroupStats = {
+  team_id: number
+  expected_group_points: number
+  expected_group_goals_for: number
+  expected_group_goals_against: number
+}
+
+export function buildPredictedRoundOf32(
+  groups: ScenarioGroup[],
+  groupOutcomes: SimulationGroupOutcome[],
+  teamStats: TeamGroupStats[],
+): ScenarioBracketMatch[] | null {
+  const statsById = new Map(teamStats.map(stat => [stat.team_id, stat]))
+  const bestByGroupId = new Map<number, SimulationGroupOutcome>()
+  for (const row of groupOutcomes) {
+    const previous = bestByGroupId.get(row.group_id)
+    if (!previous || row.count > previous.count) bestByGroupId.set(row.group_id, row)
+  }
+
+  const tables: ScenarioGroupTable[] = groups.map(group => {
+    const best = bestByGroupId.get(group.id)
+    const order = best?.order ?? group.teams.map(team => team.id)
+    const teamById = new Map(group.teams.map(team => [team.id, team]))
+    const rows = order.map((teamId, index) => {
+      const team = teamById.get(teamId)
+      if (!team) throw new Error(`Team ${teamId} missing from group ${group.code}`)
+      const stats = statsById.get(teamId)
+      const goalsFor = stats?.expected_group_goals_for ?? 0
+      const goalsAgainst = stats?.expected_group_goals_against ?? 0
+      return {
+        team,
+        position: index + 1,
+        played: 3,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        goalsFor,
+        goalsAgainst,
+        goalDifference: goalsFor - goalsAgainst,
+        points: stats?.expected_group_points ?? 0,
+        conductScore: null,
+        fifaRank: FIFA_RANKS.get(team.fifa_code) ?? null,
+      } satisfies ScenarioStanding
+    })
+    return { code: group.code, rows, complete: true, warnings: [] }
+  })
+
+  try {
+    return resolveRoundOf32Bracket(tables)
+  } catch {
+    return null
+  }
+}
+
 function buildRoundOf32(tables: ScenarioGroupTable[], thirdPlace: ScenarioStanding[]): ScenarioBracketMatch[] {
   const groupSet = thirdPlace.slice(0, 8)
     .map(row => tables.find(table => table.rows.some(candidate => candidate.team.id === row.team.id))?.code)

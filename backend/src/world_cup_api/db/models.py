@@ -371,6 +371,20 @@ class SimulationBracketResult(Base):
     team_a_advance_count: Mapped[int] = mapped_column(Integer)
 
 
+class SimulationTeamR32Rival(Base):
+    __tablename__ = "simulation_team_r32_rivals"
+    __table_args__ = (
+        UniqueConstraint("simulation_id", "team_id", "finish_position", "opponent_team_id"),
+        Index("ix_sim_team_r32_rival", "simulation_id", "team_id", "finish_position"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    simulation_id: Mapped[str] = mapped_column(ForeignKey("simulations.id", ondelete="CASCADE"))
+    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), index=True)
+    finish_position: Mapped[int] = mapped_column(Integer)
+    opponent_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), index=True)
+    meeting_count: Mapped[int] = mapped_column(Integer)
+
+
 class BracketSlot(Base):
     __tablename__ = "bracket_slots"
     __table_args__ = (UniqueConstraint("ruleset_version", "official_match_number"),)

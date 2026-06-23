@@ -26,6 +26,45 @@ describe('buildCoherentMatchMap', () => {
     expect(m90?.teamB.advanceProb).toBe(0.55)
   })
 
+  it('uses predicted round-of-32 pairings when provided', () => {
+    const bel = 10
+    const alg = 11
+    const aus = 12
+    const irn = 13
+    const egy = 14
+    const extendedTeams = [
+      ...teams,
+      { id: bel, fifa_code: 'BEL', name: 'Belgium', country_code: 'BE' },
+      { id: alg, fifa_code: 'ALG', name: 'Algeria', country_code: 'DZ' },
+      { id: aus, fifa_code: 'AUS', name: 'Australia', country_code: 'AU' },
+      { id: irn, fifa_code: 'IRN', name: 'IR Iran', country_code: 'IR' },
+      { id: egy, fifa_code: 'EGY', name: 'Egypt', country_code: 'EG' },
+    ]
+    const rows: BracketRow[] = [
+      { match_number: 82, team_a_id: bel, team_b_id: alg, meeting_count: 91_295, matchup_probability: 0.091, team_a_advance_probability: 0.62 },
+      { match_number: 82, team_a_id: egy, team_b_id: alg, meeting_count: 62_000, matchup_probability: 0.062, team_a_advance_probability: 0.58 },
+      { match_number: 88, team_a_id: aus, team_b_id: bel, meeting_count: 405_284, matchup_probability: 0.405, team_a_advance_probability: 0.55 },
+      { match_number: 88, team_a_id: aus, team_b_id: irn, meeting_count: 161_043, matchup_probability: 0.161, team_a_advance_probability: 0.58 },
+    ]
+    const predictedR32 = new Map([
+      [82, { teamAId: egy, teamBId: alg }],
+      [88, { teamAId: aus, teamBId: irn }],
+    ])
+
+    const matchMap = buildCoherentMatchMap(rows, extendedTeams, {}, predictedR32)
+    const m82 = matchMap.get(82)
+    const m88 = matchMap.get(88)
+
+    expect(m82?.teamA.id).toBe(egy)
+    expect(m82?.teamB.id).toBe(alg)
+    expect(m88?.teamA.id).toBe(aus)
+    expect(m88?.teamB.id).toBe(irn)
+    const r32Teams = [...matchMap.entries()]
+      .filter(([matchNumber]) => matchNumber <= 88)
+      .flatMap(([, match]) => [match.teamA.id, match.teamB.id])
+    expect(r32Teams.length).toBe(new Set(r32Teams).size)
+  })
+
   it('flags venue home boost for co-host teams playing in their country', () => {
     const rows: BracketRow[] = [
       { match_number: 79, team_a_id: 1, team_b_id: 2, meeting_count: 500_000, matchup_probability: 0.5, team_a_advance_probability: 0.83 },

@@ -305,6 +305,7 @@ def run_trials(
     team_results: dict[int, Counter] = {int(team_id): Counter() for team_id in snapshot["teams"]}
     group_orders: Counter = Counter()
     bracket_results: dict[tuple[int, int, int], Counter] = defaultdict(Counter)
+    r32_rivals: Counter = Counter()
     completed = 0
     params = snapshot.get("context_params", _context_params_dict())
     baseline = {
@@ -382,6 +383,7 @@ def run_trials(
                 team_results[team_a]["advance_as_third"] += 1
             if sources[1][0] == "third":
                 team_results[team_b]["advance_as_third"] += 1
+            _record_r32_rivals(r32_rivals, group_rankings, team_a, team_b)
             winner = _play_knockout(team_a, team_b, match_number, snapshot, rng, forecast_cache, trial_elos, params)
             winners[match_number] = winner
             losers[match_number] = team_b if winner == team_a else team_a
@@ -411,7 +413,13 @@ def run_trials(
         completed += 1
         if progress and (completed % 1000 == 0 or completed == iterations):
             progress(completed)
-    return {"completed": completed, "teams": team_results, "groups": group_orders, "bracket": bracket_results}
+    return {
+        "completed": completed,
+        "teams": team_results,
+        "groups": group_orders,
+        "bracket": bracket_results,
+        "r32_rivals": r32_rivals,
+    }
 
 
 def run_trials_parallel(
@@ -430,6 +438,7 @@ def run_trials_parallel(
         "teams": {int(team_id): Counter() for team_id in snapshot["teams"]},
         "groups": Counter(),
         "bracket": defaultdict(Counter),
+        "r32_rivals": Counter(),
     }
     with ProcessPoolExecutor(max_workers=max_workers) as pool:
         futures = {
@@ -448,6 +457,7 @@ def run_trials_parallel(
             aggregate["groups"].update(result["groups"])
             for key, counts in result["bracket"].items():
                 aggregate["bracket"][key].update(counts)
+            aggregate["r32_rivals"].update(result["r32_rivals"])
             if progress:
                 progress(aggregate["completed"])
     return aggregate
@@ -459,6 +469,27 @@ def _child_seed(root_seed: int, chunk_index: int) -> int:
 
 def _group_for_team(rankings: dict[str, list[StandingRow]], team_id: int) -> str:
     return next(code for code, rows in rankings.items() if any(row.team_id == team_id for row in rows))
+
+
+def _position_for_team(rankings: dict[str, list[StandingRow]], team_id: int) -> int:
+    group_code = _group_for_team(rankings, team_id)
+    for index, row in enumerate(rankings[group_code]):
+        if row.team_id == team_id:
+            return index + 1
+    raise ValueError(f"Team {team_id} not found in group rankings")
+
+
+def _record_r32_rivals(
+    rivals: Counter,
+    rankings: dict[str, list[StandingRow]],
+    team_a: int,
+    team_b: int,
+) -> None:
+    for team_id, opponent_id in ((team_a, team_b), (team_b, team_a)):
+        position = _position_for_team(rankings, team_id)
+        if position > 3:
+            continue
+        rivals[(team_id, position, opponent_id)] += 1
 
 
 def _resolve_source(source: tuple[str, str], rankings: dict[str, list[StandingRow]], assignment: dict[str, str], thirds: dict[str, int]) -> int:

@@ -107,12 +107,19 @@ export type BracketMatch = {
   scheduledAt: string | null
 }
 
+export type PredictedR32Pairing = { teamAId: number; teamBId: number }
+
 function samePairing(a1: number, a2: number, b1: number, b2: number): boolean {
   return (a1 === b1 && a2 === b2) || (a1 === b2 && a2 === b1)
 }
 
-function pickModalRow(rows: BracketRow[]): BracketRow | undefined {
-  return [...rows].sort((a, b) => b.meeting_count - a.meeting_count)[0]
+function pickModalRowWithoutConflicts(
+  rows: BracketRow[],
+  usedTeams: ReadonlySet<number>,
+): BracketRow | undefined {
+  return [...rows]
+    .sort((a, b) => b.meeting_count - a.meeting_count)
+    .find(row => !usedTeams.has(row.team_a_id) && !usedTeams.has(row.team_b_id))
 }
 
 function pickRowForPairing(rows: BracketRow[], teamA: number, teamB: number): BracketRow | undefined {
@@ -135,6 +142,7 @@ export function buildCoherentMatchMap(
   rows: BracketRow[],
   teams: Array<{ id: number; fifa_code: string; name: string; country_code: string }>,
   schedule: Record<number, string>,
+  predictedR32?: Map<number, PredictedR32Pairing>,
 ): Map<number, BracketMatch> {
   const teamById = new Map(teams.map(team => [team.id, team]))
   const grouped = new Map<number, BracketRow[]>()
@@ -146,6 +154,7 @@ export function buildCoherentMatchMap(
 
   const winners = new Map<number, number>()
   const output = new Map<number, BracketMatch>()
+  const usedR32Teams = new Set<number>()
 
   for (const matchNumber of BRACKET_MATCH_ORDER) {
     const matchRows = grouped.get(matchNumber)
@@ -159,13 +168,25 @@ export function buildCoherentMatchMap(
     let matchupProbability: number
 
     if (!feeders) {
-      sourceRow = pickModalRow(matchRows)
-      if (!sourceRow) continue
-      teamAId = sourceRow.team_a_id
-      teamBId = sourceRow.team_b_id
-      advanceA = sourceRow.team_a_advance_probability
-      matchupProbability = sourceRow.matchup_probability
-      winners.set(matchNumber, projectedWinnerId(sourceRow))
+      const predicted = predictedR32?.get(matchNumber)
+      if (predicted) {
+        teamAId = predicted.teamAId
+        teamBId = predicted.teamBId
+        sourceRow = pickRowForPairing(matchRows, teamAId, teamBId)
+        advanceA = sourceRow ? advanceProbabilityFor(sourceRow, teamAId) : 0.5
+        matchupProbability = sourceRow?.matchup_probability ?? 0
+        winners.set(matchNumber, advanceA >= 0.5 ? teamAId : teamBId)
+      } else {
+        sourceRow = pickModalRowWithoutConflicts(matchRows, usedR32Teams)
+        if (!sourceRow) continue
+        teamAId = sourceRow.team_a_id
+        teamBId = sourceRow.team_b_id
+        usedR32Teams.add(teamAId)
+        usedR32Teams.add(teamBId)
+        advanceA = sourceRow.team_a_advance_probability
+        matchupProbability = sourceRow.matchup_probability
+        winners.set(matchNumber, projectedWinnerId(sourceRow))
+      }
     } else {
       const feederA = winners.get(feeders[0])
       const feederB = winners.get(feeders[1])
