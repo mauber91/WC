@@ -5,10 +5,16 @@ import argparse
 import json
 import shutil
 import sqlite3
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sqlalchemy import func, select
+
 from world_cup_api.config import ENV_FILE, ROOT_DIR, get_settings
+from world_cup_api.db.models import SimulationTeamR32Rival
+from world_cup_api.db.session import SessionLocal
+from world_cup_api.services.simulations import backfill_r32_rivals
 
 
 def _default_db_path() -> Path:
@@ -83,6 +89,27 @@ def _dotenv_values(*keys: str) -> dict[str, str]:
     return values
 
 
+def _ensure_r32_rivals(simulation_id: str) -> None:
+    db = SessionLocal()
+    try:
+        rival_count = db.scalar(
+            select(func.count())
+            .select_from(SimulationTeamR32Rival)
+            .where(SimulationTeamR32Rival.simulation_id == simulation_id),
+        )
+        if rival_count:
+            return
+        print(f"Backfilling Round-of-32 rivals for simulation {simulation_id}...", file=sys.stderr)
+        rows = backfill_r32_rivals(
+            db,
+            simulation_id,
+            progress=lambda done, total: print(f"  {done:,} / {total:,} trials", file=sys.stderr, flush=True),
+        )
+        print(f"Wrote {rows:,} rival rows.", file=sys.stderr)
+    finally:
+        db.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Prepare a read-only publish bundle for the hosted forecast.")
     parser.add_argument("--simulation-id", help="Completed simulation UUID to publish (default: latest completed)")
@@ -104,14 +131,18 @@ def main() -> None:
     for sidecar in (Path(f"{target_db}-wal"), Path(f"{target_db}-shm")):
         if sidecar.exists():
             sidecar.unlink()
-    shutil.copy2(source_db, target_db)
 
-    with sqlite3.connect(target_db) as conn:
+    with sqlite3.connect(source_db) as conn:
         simulation_id = args.simulation_id or _latest_completed_simulation(conn)
         if not simulation_id:
             raise SystemExit("No completed simulation found to publish.")
         if not _simulation_exists(conn, simulation_id):
             raise SystemExit(f"Completed simulation not found: {simulation_id}")
+
+    _ensure_r32_rivals(simulation_id)
+    shutil.copy2(source_db, target_db)
+
+    with sqlite3.connect(target_db) as conn:
         _prune_simulations(conn, simulation_id)
         row = conn.execute(
             """

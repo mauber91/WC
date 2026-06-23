@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import datetime, timezone
+from typing import Callable
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -15,19 +16,24 @@ from world_cup_api.config import get_settings
 from world_cup_api.simulation.engine import build_input_snapshot, run_trials_parallel
 
 
-def backfill_r32_rivals(db: Session, simulation_id: str) -> int:
+def backfill_r32_rivals(db: Session, simulation_id: str, *, progress: Callable[[int, int], None] | None = None) -> int:
     run = db.get(Simulation, simulation_id)
     if run is None:
         raise LookupError(f"Simulation {simulation_id} not found")
     if run.status != "completed":
         raise ValueError(f"Simulation {simulation_id} is not completed")
 
+    if progress:
+        progress(0, run.iterations)
     output = run_trials_parallel(
         run.input_snapshot_json,
         run.iterations,
         run.seed,
         get_settings().simulation_max_workers,
     )
+    if progress:
+        progress(output["completed"], run.iterations)
+
     db.execute(delete(SimulationTeamR32Rival).where(SimulationTeamR32Rival.simulation_id == simulation_id))
     rows_written = 0
     for (team_id, finish_position, opponent_id), count in output["r32_rivals"].items():

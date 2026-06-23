@@ -30,7 +30,11 @@ def main() -> None:
             simulation_id = run.id
             print(f"Using latest completed simulation {simulation_id} ({run.iterations:,} trials, seed {run.seed})")
 
-        rows = backfill_r32_rivals(db, simulation_id)
+        rows = backfill_r32_rivals(
+            db,
+            simulation_id,
+            progress=lambda done, total: print(f"  {done:,} / {total:,} trials", flush=True),
+        )
         print(f"Wrote {rows:,} rival rows for simulation {simulation_id}")
     finally:
         db.close()
