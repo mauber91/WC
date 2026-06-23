@@ -12,4 +12,7 @@ export async function api<T = unknown>(path: string, init?: RequestInit): Promis
   return response.json()
 }
 
-export const percent = (value: number) => `${(value * 100).toFixed(value < 0.01 ? 1 : 0)}%`
+export const percent = (value: number, decimals?: number) => {
+  const precision = decimals ?? (value < 0.01 ? 1 : 0)
+  return `${(value * 100).toFixed(precision)}%`
+}

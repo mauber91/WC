@@ -118,7 +118,7 @@ function R32SlotSideList({ candidates, teams }: {
               <span aria-hidden>{flagEmoji(team.fifa_code)}</span>
               <span className="bracket-r32-tip-name" title={team.name}>{team.name}</span>
             </span>
-            <strong className="bracket-r32-tip-pct">{percent(candidate.probability)}</strong>
+            <strong className="bracket-r32-tip-pct">{percent(candidate.probability, 2)}</strong>
           </li>
         )
       })}
@@ -156,9 +156,10 @@ function R32MatchCell({ slot, matchMap, slotLeaders, teams }: {
   teams: Team[]
 }) {
   const leaders = slotLeaders.get(slot.match)
+  const tipAbove = slot.row >= 9
   return (
     <div
-      className="bracket-grid-cell has-r32-tip"
+      className={`bracket-grid-cell has-r32-tip${tipAbove ? ' tip-above' : ''}`}
       style={{ ...rowStyle(slot.row, slot.span), gridColumn: COL.r32 }}
       tabIndex={0}
     >

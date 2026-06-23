@@ -8,7 +8,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from world_cup_api.config import ROOT_DIR, get_settings
+from world_cup_api.config import ENV_FILE, ROOT_DIR, get_settings
 
 
 def _default_db_path() -> Path:
@@ -64,6 +64,25 @@ def _write_env_file(path: Path, lines: dict[str, str]) -> None:
     path.write_text("\n".join(parts) + "\n", encoding="utf-8")
 
 
+def _dotenv_values(*keys: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not ENV_FILE.exists():
+        return values
+    wanted = set(keys)
+    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, raw = line.split("=", 1)
+        key = key.strip()
+        if key not in wanted:
+            continue
+        value = raw.strip().strip('"').strip("'")
+        if value:
+            values[key] = value
+    return values
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Prepare a read-only publish bundle for the hosted forecast.")
     parser.add_argument("--simulation-id", help="Completed simulation UUID to publish (default: latest completed)")
@@ -105,22 +124,6 @@ def main() -> None:
         assert row is not None
 
     scenario = _load_scenario(args.scenario_file)
-    manifest = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "simulation_id": simulation_id,
-        "iterations": row[0],
-        "seed": row[1],
-        "input_cutoff_at": row[2],
-        "model_version": row[3],
-        "ruleset_version": row[4],
-        "completed_at": row[5],
-        "duration_ms": row[6],
-        "scenario_included": scenario is not None,
-    }
-    (args.output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    if scenario is not None:
-        (args.output_dir / "scenario.json").write_text(json.dumps(scenario, indent=2) + "\n", encoding="utf-8")
-
     backend_env = {
         "WC_DATABASE_URL": f"sqlite:////data/app/worldcup.db",
         "WC_SIMULATIONS_ENABLED": "false",
@@ -139,6 +142,24 @@ def main() -> None:
     }
     if scenario is not None:
         frontend_env["VITE_PUBLISHED_SCENARIO"] = json.dumps(scenario, separators=(",", ":"))
+    frontend_env.update(_dotenv_values("VITE_CF_WEB_ANALYTICS_TOKEN"))
+
+    manifest = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "simulation_id": simulation_id,
+        "iterations": row[0],
+        "seed": row[1],
+        "input_cutoff_at": row[2],
+        "model_version": row[3],
+        "ruleset_version": row[4],
+        "completed_at": row[5],
+        "duration_ms": row[6],
+        "scenario_included": scenario is not None,
+        "web_analytics_enabled": "VITE_CF_WEB_ANALYTICS_TOKEN" in frontend_env,
+    }
+    (args.output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    if scenario is not None:
+        (args.output_dir / "scenario.json").write_text(json.dumps(scenario, indent=2) + "\n", encoding="utf-8")
 
     _write_env_file(args.output_dir / "backend.env", backend_env)
     _write_env_file(args.output_dir / "frontend.env", frontend_env)
