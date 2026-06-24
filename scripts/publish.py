@@ -179,7 +179,11 @@ def main() -> None:
     }
     if scenario is not None:
         frontend_env["VITE_PUBLISHED_SCENARIO"] = json.dumps(scenario, separators=(",", ":"))
-    frontend_env.update(_dotenv_values("VITE_CF_WEB_ANALYTICS_TOKEN"))
+    frontend_env.update(_dotenv_values("VITE_CF_WEB_ANALYTICS_TOKEN", "VITE_SITE_URL", "WC_PAGES_ORIGIN"))
+    if "VITE_SITE_URL" not in frontend_env and "WC_PAGES_ORIGIN" in frontend_env:
+        frontend_env["VITE_SITE_URL"] = frontend_env["WC_PAGES_ORIGIN"]
+    if "VITE_SITE_URL" not in frontend_env:
+        frontend_env["VITE_SITE_URL"] = "https://wc-forecast.pages.dev"
 
     manifest = {
         "generated_at": datetime.now(timezone.utc).isoformat(),

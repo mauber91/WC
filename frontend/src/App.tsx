@@ -12,6 +12,8 @@ import { MethodologyPage } from './pages/MethodologyPage'
 import { useLatestSimulation, useRuns, type SimulationRun } from './hooks/useLatestSimulation'
 import { flagEmoji } from './lib/flags'
 import { teamPath } from './lib/teamSlug'
+import { RouteSeo } from './seo/RouteSeo'
+import { SITE_SHORT_NAME } from './seo/siteMeta'
 import './App.css'
 
 type Team = { id: number; slug: string; fifa_code: string; name: string; country_code?: string; group_id?: number; is_host?: boolean }
@@ -75,8 +77,9 @@ function SidebarNav({ items, sectionLabel }: { items: NavItem[]; sectionLabel?: 
 
 function App() {
   return <div className="app-shell">
+    <RouteSeo />
     <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">26</span><div><strong>Forecast</strong><small>{isPublishedMode ? 'Probabilistic simulation' : 'World Cup intelligence'}</small></div></div>
+      <div className="brand"><span className="brand-mark">26</span><div><strong>{SITE_SHORT_NAME}</strong><small>{isPublishedMode ? 'Probabilistic simulation' : 'World Cup intelligence'}</small></div></div>
       {isPublishedMode ? <>
         <SidebarNav items={forecastNav} sectionLabel="Probabilistic simulation model" />
         <SidebarNav items={scenarioNav} sectionLabel="Scenario" />

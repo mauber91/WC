@@ -33,6 +33,7 @@ jobs:
       VITE_PUBLISHED_SCENARIO_TITLE: ${{ vars.VITE_PUBLISHED_SCENARIO_TITLE || 'Author scenario' }}
       VITE_PUBLISHED_SCENARIO_DESCRIPTION: ${{ vars.VITE_PUBLISHED_SCENARIO_DESCRIPTION || 'A fixed what-if bracket built from chosen group-stage results.' }}
       VITE_CF_WEB_ANALYTICS_TOKEN: ${{ secrets.VITE_CF_WEB_ANALYTICS_TOKEN }}
+      VITE_SITE_URL: ${{ vars.VITE_SITE_URL || 'https://wc-forecast.pages.dev' }}
     steps:
       - uses: actions/checkout@v4
 

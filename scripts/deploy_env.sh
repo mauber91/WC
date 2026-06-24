@@ -64,3 +64,14 @@ deploy_api_base_url() {
 deploy_pages_project() {
   deploy_env_value CF_PAGES_PROJECT wc-forecast
 }
+
+deploy_site_url() {
+  local configured origin
+  configured="$(deploy_env_value VITE_SITE_URL "")"
+  if [[ -n "$configured" ]]; then
+    printf '%s\n' "$configured"
+    return
+  fi
+  origin="$(deploy_pages_origin)"
+  printf '%s\n' "$origin"
+}
