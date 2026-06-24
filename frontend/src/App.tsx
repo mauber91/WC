@@ -76,9 +76,9 @@ function SidebarNav({ items, sectionLabel }: { items: NavItem[]; sectionLabel?: 
 function App() {
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">26</span><div><strong>Forecast</strong><small>{isPublishedMode ? 'Published forecast' : 'World Cup intelligence'}</small></div></div>
+      <div className="brand"><span className="brand-mark">26</span><div><strong>Forecast</strong><small>{isPublishedMode ? 'Probabilistic simulation' : 'World Cup intelligence'}</small></div></div>
       {isPublishedMode ? <>
-        <SidebarNav items={forecastNav} sectionLabel="Forecast" />
+        <SidebarNav items={forecastNav} sectionLabel="Probabilistic simulation model" />
         <SidebarNav items={scenarioNav} sectionLabel="Scenario" />
         <SidebarPublishedStatus />
       </> : <>
