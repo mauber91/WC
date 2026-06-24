@@ -2,10 +2,20 @@ import { toPng } from 'html-to-image'
 
 const EXPORT_CLASS = 'bracket-grid--export'
 const WRAP_EXPORT_CLASS = 'bracket-tree-wrap--exporting'
+const JOIN_LINE_STROKE = '#2d9653'
 
 function waitForLayout(): Promise<void> {
   return new Promise(resolve => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  })
+}
+
+function prepareJoinLinesForExport(root: HTMLElement): void {
+  root.querySelectorAll<SVGPathElement>('.bracket-join-line').forEach(path => {
+    path.setAttribute('stroke', JOIN_LINE_STROKE)
+    path.setAttribute('stroke-width', '2')
+    path.setAttribute('fill', 'none')
+    path.setAttribute('vector-effect', 'non-scaling-stroke')
   })
 }
 
@@ -18,6 +28,7 @@ export async function exportBracketPng(
   wrap?.classList.add(WRAP_EXPORT_CLASS)
 
   await waitForLayout()
+  prepareJoinLinesForExport(grid)
 
   try {
     const width = grid.scrollWidth
@@ -28,6 +39,7 @@ export async function exportBracketPng(
       backgroundColor: '#ffffff',
       width,
       height,
+      includeStyleProperties: ['stroke', 'stroke-width', 'fill', 'opacity', 'color'],
       style: {
         width: `${width}px`,
         height: `${height}px`,

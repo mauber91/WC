@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { percent } from '../api/client'
 import { bracketExportFilename, exportBracketPng } from '../lib/exportBracketPng'
+import { BracketJoinCell } from './BracketJoinCell'
 import { flagEmoji } from '../lib/flags'
 import { formatSimulationCoverage, type SimulationResultCoverage } from '../lib/simulationCoverage'
 import { buildCoherentMatchMap, buildR32SlotLeaderboards, type BracketMatch, type BracketRow, type PredictedR32Pairing, type R32MatchSlotLeaders } from '../lib/bracketPath'
-import { KNOCKOUT_SCHEDULE } from '../lib/knockoutSchedule'
+import { KNOCKOUT_SCHEDULE, formatKnockoutKickoff } from '../lib/knockoutSchedule'
 import { buildPredictedRoundOf32, type SimulationGroupOutcome, type TeamGroupStats } from '../features/manualScenario/scenarioEngine'
 import {
   BRACKET_COL as COL,
@@ -18,23 +19,12 @@ import {
   R32_SLOTS,
   SF_SLOTS,
   bracketRowStyle,
-  type BracketJoin as Join,
   type BracketSlot,
 } from '../lib/bracketLayout'
 
 export type { BracketRow }
 
 type Team = { id: number; fifa_code: string; name: string; country_code?: string }
-
-function formatSchedule(iso: string | null, matchNumber: number) {
-  if (!iso) return { day: 'TBD', time: '—', date: `M${matchNumber}` }
-  const date = new Date(iso)
-  return {
-    day: date.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase(),
-    time: date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false }),
-    date: date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }).toUpperCase(),
-  }
-}
 
 function buildMatchMap(
   rows: BracketRow[],
@@ -60,7 +50,7 @@ function BracketMatchCard({ match, matchNumber, isFinal = false }: {
   if (!match) {
     return <div className="bracket-match-card empty"><span className="bracket-badge">Awaiting sim</span><p>M{matchNumber}</p></div>
   }
-  const schedule = formatSchedule(match.scheduledAt, match.matchNumber)
+  const schedule = formatKnockoutKickoff(match.scheduledAt, match.matchNumber)
   const label = match.matchupProbability >= 0.15 ? 'Most likely' : 'Projected'
   return (
     <article className={`bracket-match-card${isFinal ? ' final' : ''}`}>
@@ -179,21 +169,6 @@ function MatchCell({ slot, column, matchMap, isFinal }: {
   )
 }
 
-/** One SVG per gap: horizontals from feeder card edges, vertical at next-card edge. */
-function JoinCell({ join, column }: { join: Join; column: number }) {
-  return (
-    <div className="bracket-join" style={{ ...rowStyle(join.row, join.span), gridColumn: column }}>
-      <svg className="bracket-join-svg" viewBox="0 0 532 100" preserveAspectRatio="none" aria-hidden>
-        <path
-          d="M 252 25 H 280 M 252 75 H 280 M 280 25 V 75"
-          fill="none"
-          className="bracket-join-line"
-        />
-      </svg>
-    </div>
-  )
-}
-
 export function BracketBoard({
   rows,
   teams,
@@ -288,16 +263,16 @@ export function BracketBoard({
         {R32_SLOTS.map(slot => (
           <R32MatchCell key={slot.match} slot={slot} matchMap={matchMap} slotLeaders={r32SlotLeaders} teams={teams} />
         ))}
-        {JOIN_R32_R16.map((join, index) => <JoinCell key={`j1-${index}`} join={join} column={COL.c1} />)}
+        {JOIN_R32_R16.map((join, index) => <BracketJoinCell key={`j1-${index}`} join={join} column={COL.c1} />)}
 
         {R16_SLOTS.map(slot => <MatchCell key={slot.match} slot={slot} column={COL.r16} matchMap={matchMap} />)}
-        {JOIN_R16_QF.map((join, index) => <JoinCell key={`j2-${index}`} join={join} column={COL.c2} />)}
+        {JOIN_R16_QF.map((join, index) => <BracketJoinCell key={`j2-${index}`} join={join} column={COL.c2} />)}
 
         {QF_SLOTS.map(slot => <MatchCell key={slot.match} slot={slot} column={COL.qf} matchMap={matchMap} />)}
-        {JOIN_QF_SF.map((join, index) => <JoinCell key={`j3-${index}`} join={join} column={COL.c3} />)}
+        {JOIN_QF_SF.map((join, index) => <BracketJoinCell key={`j3-${index}`} join={join} column={COL.c3} />)}
 
         {SF_SLOTS.map(slot => <MatchCell key={slot.match} slot={slot} column={COL.sf} matchMap={matchMap} />)}
-        {JOIN_SF_FINAL.map((join, index) => <JoinCell key={`j4-${index}`} join={join} column={COL.c4} />)}
+        {JOIN_SF_FINAL.map((join, index) => <BracketJoinCell key={`j4-${index}`} join={join} column={COL.c4} />)}
 
         <MatchCell slot={FINAL_SLOT} column={COL.final} matchMap={matchMap} isFinal />
         </div>
