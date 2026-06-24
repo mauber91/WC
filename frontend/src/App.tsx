@@ -39,7 +39,7 @@ const localNav: NavItem[] = [
   { to: '/groups/A', label: 'Groups', activePrefix: '/groups' },
   { to: '/matches', label: 'Matches', activePrefix: '/matches' },
   { to: '/simulator', label: 'Simulator', activePrefix: '/simulator' },
-  { to: '/scenario', label: 'Scenario', activePrefix: '/scenario' },
+  { to: '/scenario', label: 'Your bracket', activePrefix: '/scenario' },
   { to: '/bracket', label: 'Bracket', activePrefix: '/bracket' },
   { to: '/teams', label: 'Teams', activePrefix: '/teams' },
   { to: '/methodology', label: 'Methodology', activePrefix: '/methodology' },

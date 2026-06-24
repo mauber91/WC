@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
+import { publishedScenarioDescription, publishedScenarioTitle } from '../../config/appMode'
 import { flagEmoji } from '../../lib/flags'
 import { ScenarioBracket } from './ScenarioBracket'
 import {
@@ -167,13 +168,15 @@ function ThirdPlaceTable({ rows, complete, groupByTeam }: {
 export function ManualScenarioPage({
   readOnly = false,
   fixedScores,
-  title = 'Manual group scenario',
-  description = 'Enter final scores for every unfinished group match and see the exact Round-of-32 slots those results create. Your inputs are saved in this browser only and never change the published forecast or simulation.',
+  title,
+  description,
+  eyebrow,
 }: {
   readOnly?: boolean
   fixedScores?: ManualScores
   title?: string
   description?: string
+  eyebrow?: string
 } = {}) {
   const groups = useQuery<ScenarioGroup[]>({ queryKey: ['groups'], queryFn: () => api('/groups') })
   const matches = useQuery<ScenarioMatch[]>({ queryKey: ['matches'], queryFn: () => api('/matches') })
@@ -266,10 +269,16 @@ export function ManualScenarioPage({
   const qualifiedThirds = new Set(complete ? outcome.thirdPlace.slice(0, 8).map(row => row.team.id) : [])
   const groupByTeam = new Map(groups.data?.flatMap(group => group.teams.map(team => [team.id, group.code] as const)) ?? [])
 
+  const pageEyebrow = eyebrow ?? (readOnly ? 'Published what-if' : 'Your bracket')
+  const pageTitle = title ?? (readOnly ? publishedScenarioTitle : 'Knockout Builder')
+  const pageDescription = description ?? (readOnly
+    ? publishedScenarioDescription
+    : 'Enter remaining group scores and pick knockout winners to map out your bracket. Saved in this browser only — separate from the Monte Carlo forecast.')
+
   return (
     <>
       <header className="page-header">
-        <div><span className="eyebrow">{readOnly ? 'Published what-if' : 'What-if workspace'}</span><h1>{title}</h1><p>{description}</p></div>
+        <div><span className="eyebrow">{pageEyebrow}</span><h1>{pageTitle}</h1><p>{pageDescription}</p></div>
         {!readOnly && <span className="local-only-badge">Saved in this browser only</span>}
       </header>
 
