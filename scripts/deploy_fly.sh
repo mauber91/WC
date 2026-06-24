@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# shellcheck disable=SC1091
+source "$ROOT/scripts/deploy_env.sh"
+
 APP=""
 CORS_ORIGIN=""
 API_BASE_URL=""
@@ -22,11 +25,12 @@ usage() {
 Deploy the read-only published API to Fly.io.
 
 Usage:
-  scripts/deploy_fly.sh --app <fly-app> --cors-origin <frontend-url> [options]
+  scripts/deploy_fly.sh [options]
 
-Required:
-  --app             Fly app name (must match fly.toml `app`)
-  --cors-origin     Frontend origin for WC_CORS_ORIGINS (e.g. https://wc.pages.dev)
+Defaults (from .env when set):
+  --app             WC_FLY_APP (default: wc-forecast-api)
+  --cors-origin     WC_PAGES_ORIGIN (default: https://wc-forecast.pages.dev)
+  --api-base-url    WC_PUBLISH_API_BASE_URL (default: https://<app>.fly.dev/api/v1)
 
 Options:
   --api-base-url    Public API URL for frontend build env (default: https://<app>.fly.dev/api/v1)
@@ -63,6 +67,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -z "$APP" ]]; then
+  APP="$(deploy_fly_app)"
+fi
+if [[ -z "$CORS_ORIGIN" ]]; then
+  CORS_ORIGIN="$(deploy_pages_origin)"
+fi
+
 if [[ -z "$APP" || -z "$CORS_ORIGIN" ]]; then
   usage
   exit 1
@@ -74,7 +85,7 @@ if ! command -v fly >/dev/null 2>&1; then
 fi
 
 if [[ -z "$API_BASE_URL" ]]; then
-  API_BASE_URL="https://${APP}.fly.dev/api/v1"
+  API_BASE_URL="$(deploy_api_base_url)"
 fi
 
 PUBLISH_ARGS=(--api-base-url "$API_BASE_URL" --scenario-title "$SCENARIO_TITLE" --scenario-description "$SCENARIO_DESCRIPTION")

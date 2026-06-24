@@ -4,7 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PROJECT="wc-forecast"
+# shellcheck disable=SC1091
+source "$ROOT/scripts/deploy_env.sh"
+
+PROJECT=""
 API_BASE_URL=""
 SCENARIO_FILE=""
 SCENARIO_TITLE="Author scenario"
@@ -22,8 +25,8 @@ Usage:
   scripts/deploy_pages.sh [options]
 
 Options:
-  --project             Cloudflare Pages project name (default: wc-forecast)
-  --api-base-url        Fly API URL for VITE_API_BASE_URL (required unless publish/ exists)
+  --project             CF_PAGES_PROJECT (default: wc-forecast)
+  --api-base-url        WC_PUBLISH_API_BASE_URL when publishing
   --scenario-file       scenario.json exported from the local Scenario tab
   --simulation-id       Publish a specific completed simulation UUID
   --branch              Pages branch alias (default: production)
@@ -52,6 +55,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -z "$PROJECT" ]]; then
+  PROJECT="$(deploy_pages_project)"
+fi
+
 if ! command -v npx >/dev/null 2>&1; then
   echo "npx not found. Install Node.js 20+." >&2
   exit 1
@@ -59,6 +66,9 @@ fi
 
 FRONTEND_ENV="$ROOT/publish/frontend.env"
 if [[ "$SKIP_PUBLISH" -eq 0 ]]; then
+  if [[ -z "$API_BASE_URL" ]]; then
+    API_BASE_URL="$(deploy_api_base_url)"
+  fi
   if [[ -z "$API_BASE_URL" ]]; then
     echo "--api-base-url is required when publishing." >&2
     exit 1
@@ -90,7 +100,7 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
   (cd frontend && npm ci && npm run build)
 else
   echo "==> Skipping frontend build (--skip-build)"
-  if ! rg -q "Published forecast" frontend/dist/assets/*.js 2>/dev/null; then
+  if ! rg -q "Probabilistic simulation|Published forecast" frontend/dist/assets/*.js 2>/dev/null; then
     echo "ERROR: frontend/dist was not built in published mode. Re-run without --skip-build." >&2
     exit 1
   fi

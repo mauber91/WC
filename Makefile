@@ -1,4 +1,4 @@
-.PHONY: setup dev-api dev-web dev-remote remote-setup ssh-tunnel spark-ping spark-sync spark-setup spark-dev spark-tunnel test lint build migrate benchmark report-inspect report-extract report-ingest
+.PHONY: setup dev-api dev-web dev-remote remote-setup ssh-tunnel spark-ping spark-sync spark-setup spark-dev spark-tunnel test lint build migrate benchmark report-inspect report-extract report-ingest publish deploy deploy-sim deploy-ui deploy-fly deploy-pages
 
 setup:
 	cd backend && uv sync
@@ -59,6 +59,18 @@ sync-markets:
 
 publish:
 	cd backend && uv run python ../scripts/publish.py $(ARGS)
+
+deploy:
+	chmod +x scripts/deploy.sh
+	./scripts/deploy.sh $(ARGS)
+
+deploy-sim:
+	chmod +x scripts/deploy.sh
+	./scripts/deploy.sh sim $(ARGS)
+
+deploy-ui:
+	chmod +x scripts/deploy.sh
+	./scripts/deploy.sh ui $(ARGS)
 
 deploy-fly:
 	chmod +x scripts/deploy_fly.sh

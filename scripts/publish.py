@@ -45,6 +45,11 @@ def _simulation_exists(conn: sqlite3.Connection, simulation_id: str) -> bool:
     return row is not None
 
 
+def _checkpoint_source_db(source_db: Path) -> None:
+    with sqlite3.connect(source_db) as conn:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
+
 def _prune_simulations(conn: sqlite3.Connection, keep_id: str) -> None:
     conn.execute("DELETE FROM simulations WHERE id != ?", (keep_id,))
     conn.commit()
@@ -140,6 +145,7 @@ def main() -> None:
             raise SystemExit(f"Completed simulation not found: {simulation_id}")
 
     _ensure_r32_rivals(simulation_id)
+    _checkpoint_source_db(source_db)
     shutil.copy2(source_db, target_db)
 
     with sqlite3.connect(target_db) as conn:
@@ -203,12 +209,18 @@ def main() -> None:
 
 Re-publish simulation only (no API image rebuild)
 -------------------------------------------------
-make deploy-fly ARGS="--app your-app-name --cors-origin https://your-project.pages.dev --skip-deploy"
+make deploy-sim
 
-Cloudflare Pages (local CLI)
-----------------------------
-1. npx wrangler login
-2. make deploy-pages ARGS="--api-base-url {args.api_base_url} --project wc-forecast"
+Full publish (simulation + frontend)
+------------------------------------
+make deploy
+
+Frontend only (reuse publish/frontend.env)
+------------------------------------------
+make deploy-ui
+
+Manual flags still work:
+make deploy-fly ARGS="--app your-app-name --cors-origin https://your-project.pages.dev --skip-deploy"
 
 Cloudflare Pages (GitHub Actions)
 ---------------------------------
