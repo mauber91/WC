@@ -6,6 +6,10 @@ describe('bracketExportWidth', () => {
   it('matches the fixed five-column export layout', () => {
     expect(bracketExportWidth()).toBe(5 * 268 + 4 * 28 + 8)
   })
+
+  it('scales with a measured column width', () => {
+    expect(bracketExportWidth(240)).toBe(5 * 240 + 4 * 28 + 8)
+  })
 })
 
 describe('bracketExportFilename', () => {
