@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { bracketExportFilename, scenarioBracketExportFilename } from './exportBracketPng'
+import { bracketExportFilename, bracketExportWidth, scenarioBracketExportFilename } from './exportBracketPng'
+
+describe('bracketExportWidth', () => {
+  it('matches the fixed five-column export layout', () => {
+    expect(bracketExportWidth()).toBe(5 * 268 + 4 * 28 + 8)
+  })
+})
 
 describe('bracketExportFilename', () => {
   it('includes date and simulation id prefix', () => {
