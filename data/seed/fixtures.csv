@@ -47,12 +47,12 @@ match_number,group_code,team_a_fifa_code,team_b_fifa_code,scheduled_at,venue,hos
 46,L,PAN,CRO,2026-06-23T23:00:00Z,BMO Field,CA,final
 47,K,POR,UZB,2026-06-23T17:00:00Z,NRG Stadium,US,final
 48,K,COL,COD,2026-06-24T02:00:00Z,Estadio Akron,MX,final
-49,C,SCO,BRA,2026-06-24T22:00:00Z,Hard Rock Stadium,US,scheduled
-50,C,MAR,HAI,2026-06-24T22:00:00Z,Mercedes-Benz Stadium,US,scheduled
-51,B,SUI,CAN,2026-06-24T19:00:00Z,BC Place,CA,scheduled
-52,B,BIH,QAT,2026-06-24T19:00:00Z,Lumen Field,US,scheduled
-53,A,CZE,MEX,2026-06-25T01:00:00Z,Estadio Azteca,MX,scheduled
-54,A,RSA,KOR,2026-06-25T01:00:00Z,Estadio BBVA,MX,scheduled
+49,C,SCO,BRA,2026-06-24T22:00:00Z,Hard Rock Stadium,US,final
+50,C,MAR,HAI,2026-06-24T22:00:00Z,Mercedes-Benz Stadium,US,final
+51,B,SUI,CAN,2026-06-24T19:00:00Z,BC Place,CA,final
+52,B,BIH,QAT,2026-06-24T19:00:00Z,Lumen Field,US,final
+53,A,CZE,MEX,2026-06-25T01:00:00Z,Estadio Azteca,MX,final
+54,A,RSA,KOR,2026-06-25T01:00:00Z,Estadio BBVA,MX,final
 55,E,CUW,CIV,2026-06-25T20:00:00Z,Lincoln Financial Field,US,scheduled
 56,E,ECU,GER,2026-06-25T20:00:00Z,MetLife Stadium,US,scheduled
 57,F,JPN,SWE,2026-06-25T23:00:00Z,AT&T Stadium,US,scheduled

@@ -50,6 +50,18 @@ def _checkpoint_source_db(source_db: Path) -> None:
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
 
+def _stamp_alembic_head(db_path: Path) -> None:
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'",
+        ).fetchone()
+        if row is None:
+            conn.execute("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)")
+        conn.execute("DELETE FROM alembic_version")
+        conn.execute("INSERT INTO alembic_version (version_num) VALUES (?)", ("d7f1a2b3c4e5",))
+        conn.commit()
+
+
 def _prune_simulations(conn: sqlite3.Connection, keep_id: str) -> None:
     conn.execute("DELETE FROM simulations WHERE id != ?", (keep_id,))
     conn.commit()
@@ -159,6 +171,8 @@ def main() -> None:
             (simulation_id,),
         ).fetchone()
         assert row is not None
+
+    _stamp_alembic_head(target_db)
 
     scenario = _load_scenario(args.scenario_file)
     backend_env = {

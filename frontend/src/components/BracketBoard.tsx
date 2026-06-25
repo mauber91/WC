@@ -63,12 +63,12 @@ function BracketMatchCard({ match, matchNumber, isFinal = false }: {
           <TeamLine team={match.teamA} />
           <TeamLine team={match.teamB} />
         </div>
+        <footer className="bracket-schedule">
+          <span>{schedule.day}</span>
+          <strong>{schedule.time}</strong>
+          <span>{match.scheduledAt ? schedule.date : `M${match.matchNumber}`}</span>
+        </footer>
       </div>
-      <aside className="bracket-schedule">
-        <span>{schedule.day}</span>
-        <strong>{schedule.time}</strong>
-        <span>{match.scheduledAt ? schedule.date : `M${match.matchNumber}`}</span>
-      </aside>
     </article>
   )
 }
