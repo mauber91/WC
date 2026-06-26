@@ -5,3 +5,5 @@
 body { margin:0; min-width:320px; min-height:100vh; }
 button,input,select { font:inherit; }
 button,a { -webkit-tap-highlight-color:transparent; }
+html { -webkit-text-size-adjust:100%; }
+@media (hover:none){ .bracket-grid-cell.has-r32-tip { -webkit-tap-highlight-color:transparent; } }

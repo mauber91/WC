@@ -1,4 +1,4 @@
-.PHONY: setup dev-api dev-web dev-remote remote-setup ssh-tunnel spark-ping spark-sync spark-setup spark-dev spark-tunnel test lint build migrate benchmark report-inspect report-extract report-ingest publish deploy deploy-sim deploy-ui deploy-fly deploy-pages
+.PHONY: setup dev-api dev-web dev-remote release remote-setup ssh-tunnel spark-ping spark-sync spark-setup spark-dev spark-tunnel test lint build migrate benchmark report-inspect report-extract report-ingest publish deploy deploy-sim deploy-ui deploy-fly deploy-pages
 
 setup:
 	cd backend && uv sync
@@ -14,6 +14,10 @@ dev-web:
 dev-remote:
 	chmod +x scripts/dev_remote.sh
 	WC_DEV_HOST=127.0.0.1 ./scripts/dev_remote.sh
+
+release:
+	chmod +x scripts/serve_release.sh
+	./scripts/serve_release.sh $(ARGS)
 
 remote-setup:
 	chmod +x scripts/remote_setup.sh

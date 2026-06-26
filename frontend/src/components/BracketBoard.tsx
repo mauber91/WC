@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { percent } from '../api/client'
 import { bracketExportFilename, exportBracketPng } from '../lib/exportBracketPng'
 import { BracketJoinCell } from './BracketJoinCell'
@@ -142,11 +142,33 @@ function R32MatchCell({ slot, matchMap, slotLeaders, teams }: {
 }) {
   const leaders = slotLeaders.get(slot.match)
   const tipAbove = slot.row >= 9
+  const [tipOpen, setTipOpen] = useState(false)
+  const cellRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!tipOpen) return
+    function onPointerDown(event: PointerEvent) {
+      if (cellRef.current && !cellRef.current.contains(event.target as Node)) setTipOpen(false)
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setTipOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [tipOpen])
   return (
     <div
-      className={`bracket-grid-cell has-r32-tip${tipAbove ? ' tip-above' : ''}`}
+      ref={cellRef}
+      className={`bracket-grid-cell has-r32-tip${tipAbove ? ' tip-above' : ''}${tipOpen ? ' tip-open' : ''}`}
       style={{ ...rowStyle(slot.row, slot.span), gridColumn: COL.r32 }}
       tabIndex={0}
+      role="button"
+      aria-expanded={tipOpen}
+      aria-label={`Round of 32 match ${slot.match} slot chances`}
+      onClick={() => setTipOpen(open => !open)}
     >
       <BracketMatchCard match={matchMap.get(slot.match)} matchNumber={slot.match} />
       {leaders && (
@@ -235,7 +257,7 @@ export function BracketBoard({
           One projected knockout path from {iterations.toLocaleString()} simulations: the most likely group-stage
           finish in each group, then the official Round-of-32 slot rules (including third-place assignments).
           Later rounds follow favored winners from the prior round; percentages are sim win rates for that pairing.
-          Hover a Round-of-32 match to see the top 3 teams for each side of that slot.
+          Tap a Round-of-32 match to see the top 3 teams for each side of that slot.
           <span className="bracket-meta-home"> H = venue home boost (MX/US/CA playing in their host country).</span>
         </p>
         <div className="bracket-jump">

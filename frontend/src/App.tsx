@@ -52,7 +52,7 @@ const scenarioNav: NavItem[] = [
   { to: '/scenario', label: 'Your bracket', activePrefix: '/scenario' },
 ]
 
-function SidebarNav({ items, sectionLabel }: { items: NavItem[]; sectionLabel?: string }) {
+function SidebarNav({ items, sectionLabel, onNavigate }: { items: NavItem[]; sectionLabel?: string; onNavigate?: () => void }) {
   const location = useLocation()
   return (
     <div className="sidebar-nav-section">
@@ -64,6 +64,7 @@ function SidebarNav({ items, sectionLabel }: { items: NavItem[]; sectionLabel?: 
             <NavLink
               key={to}
               to={to}
+              onClick={onNavigate}
               className={activePrefix ? (active ? 'active' : '') : ({ isActive }) => isActive ? 'active' : ''}
             >
               {label}
@@ -76,20 +77,27 @@ function SidebarNav({ items, sectionLabel }: { items: NavItem[]; sectionLabel?: 
 }
 
 function App() {
+  const [menuOpen, setMenuOpen] = useState(false)
   return <div className="app-shell">
     <RouteSeo />
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">26</span><div><strong>{SITE_SHORT_NAME}</strong><small>{isPublishedMode ? 'Probabilistic simulation' : 'World Cup intelligence'}</small></div></div>
+    <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
+      <div className="sidebar-top">
+        <div className="brand"><span className="brand-mark">26</span><div><strong>{SITE_SHORT_NAME}</strong><small>{isPublishedMode ? 'Probabilistic simulation' : 'World Cup intelligence'}</small></div></div>
+        <button type="button" className="sidebar-menu-toggle" aria-label="Toggle navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(open => !open)}><span /><span /><span /></button>
+      </div>
+      <div className="sidebar-body">
       {isPublishedMode ? <>
-        <SidebarNav items={forecastNav} sectionLabel="Probabilistic simulation model" />
-        <SidebarNav items={scenarioNav} sectionLabel="Scenario" />
+        <SidebarNav items={forecastNav} sectionLabel="Probabilistic simulation model" onNavigate={() => setMenuOpen(false)} />
+        <SidebarNav items={scenarioNav} sectionLabel="Scenario" onNavigate={() => setMenuOpen(false)} />
         <SidebarPublishedStatus />
       </> : <>
-        <SidebarNav items={localNav} />
+        <SidebarNav items={localNav} onNavigate={() => setMenuOpen(false)} />
         <SidebarSimulationStatus />
       </>}
       <div className="sidebar-note"><span className="live-dot" /> {isPublishedMode ? 'Forecast + what-if playground' : 'Local data workspace'}<small>{isPublishedMode ? 'Scenario scores stay in your browser.' : 'Probabilities, not promises.'}</small></div>
+      </div>
     </aside>
+    {menuOpen && <button type="button" className="sidebar-backdrop" aria-hidden tabIndex={-1} onClick={() => setMenuOpen(false)} />}
     <main className="main"><Routes>
       <Route path="/" element={<Navigate to={isPublishedMode ? '/bracket' : '/groups/A'} replace />} />
       <Route path="/groups/:code" element={<GroupPage />} />
