@@ -1,16 +1,4 @@
 match_number,bookmaker,selection,decimal_odds,snapshot_at,market_type
-57,model-consensus,team_a,1.97,2026-06-20T14:00:00Z,1X2
-57,model-consensus,draw,4.43,2026-06-20T14:00:00Z,1X2
-57,model-consensus,team_b,4.73,2026-06-20T14:00:00Z,1X2
-58,model-consensus,team_a,6.52,2026-06-20T14:00:00Z,1X2
-58,model-consensus,draw,5.01,2026-06-20T14:00:00Z,1X2
-58,model-consensus,team_b,1.69,2026-06-20T14:00:00Z,1X2
-59,model-consensus,team_a,4.27,2026-06-20T14:00:00Z,1X2
-59,model-consensus,draw,4.3,2026-06-20T14:00:00Z,1X2
-59,model-consensus,team_b,2.1,2026-06-20T14:00:00Z,1X2
-60,model-consensus,team_a,3.63,2026-06-20T14:00:00Z,1X2
-60,model-consensus,draw,4.15,2026-06-20T14:00:00Z,1X2
-60,model-consensus,team_b,2.34,2026-06-20T14:00:00Z,1X2
 61,model-consensus,team_a,4.73,2026-06-20T14:00:00Z,1X2
 61,model-consensus,draw,4.44,2026-06-20T14:00:00Z,1X2
 61,model-consensus,team_b,1.97,2026-06-20T14:00:00Z,1X2

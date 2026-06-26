@@ -55,10 +55,10 @@ match_number,group_code,team_a_fifa_code,team_b_fifa_code,scheduled_at,venue,hos
 54,A,RSA,KOR,2026-06-25T01:00:00Z,Estadio BBVA,MX,final
 55,E,CUW,CIV,2026-06-25T20:00:00Z,Lincoln Financial Field,US,final
 56,E,ECU,GER,2026-06-25T20:00:00Z,MetLife Stadium,US,final
-57,F,JPN,SWE,2026-06-25T23:00:00Z,AT&T Stadium,US,scheduled
-58,F,TUN,NED,2026-06-25T23:00:00Z,Arrowhead Stadium,US,scheduled
-59,D,TUR,USA,2026-06-26T02:00:00Z,SoFi Stadium,US,scheduled
-60,D,PAR,AUS,2026-06-26T02:00:00Z,Levi's Stadium,US,scheduled
+57,F,JPN,SWE,2026-06-25T23:00:00Z,AT&T Stadium,US,final
+58,F,TUN,NED,2026-06-25T23:00:00Z,Arrowhead Stadium,US,final
+59,D,TUR,USA,2026-06-26T02:00:00Z,SoFi Stadium,US,final
+60,D,PAR,AUS,2026-06-26T02:00:00Z,Levi's Stadium,US,final
 61,I,NOR,FRA,2026-06-26T19:00:00Z,Gillette Stadium,US,scheduled
 62,I,SEN,IRQ,2026-06-26T19:00:00Z,BMO Field,CA,scheduled
 63,G,EGY,IRN,2026-06-27T03:00:00Z,Lumen Field,US,scheduled

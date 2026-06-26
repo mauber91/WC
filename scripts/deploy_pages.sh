@@ -121,11 +121,11 @@ if [[ -n "$BRANCH" ]]; then
 fi
 
 echo "==> Deploying to Cloudflare Pages (${PROJECT})"
-if ! npx wrangler pages project list 2>/dev/null | rg -q "${PROJECT}"; then
-  echo "==> Creating Cloudflare Pages project ${PROJECT}"
+if ! (cd frontend && npx wrangler pages deploy dist --project-name "$PROJECT" --commit-dirty=true); then
+  echo "==> Pages project missing — creating ${PROJECT}"
   npx wrangler pages project create "$PROJECT" --production-branch main
+  (cd frontend && npx wrangler pages deploy dist --project-name "$PROJECT" --commit-dirty=true)
 fi
-(cd frontend && npx wrangler pages deploy dist --project-name "$PROJECT" --commit-dirty=true)
 
 PAGES_URL="https://${PROJECT}.pages.dev"
 if [[ -n "$BRANCH" && "$BRANCH" != "production" ]]; then
