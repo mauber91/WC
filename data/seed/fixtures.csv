@@ -59,8 +59,8 @@ match_number,group_code,team_a_fifa_code,team_b_fifa_code,scheduled_at,venue,hos
 58,F,TUN,NED,2026-06-25T23:00:00Z,Arrowhead Stadium,US,final
 59,D,TUR,USA,2026-06-26T02:00:00Z,SoFi Stadium,US,final
 60,D,PAR,AUS,2026-06-26T02:00:00Z,Levi's Stadium,US,final
-61,I,NOR,FRA,2026-06-26T19:00:00Z,Gillette Stadium,US,scheduled
-62,I,SEN,IRQ,2026-06-26T19:00:00Z,BMO Field,CA,scheduled
+61,I,NOR,FRA,2026-06-26T19:00:00Z,Gillette Stadium,US,final
+62,I,SEN,IRQ,2026-06-26T19:00:00Z,BMO Field,CA,final
 63,G,EGY,IRN,2026-06-27T03:00:00Z,Lumen Field,US,scheduled
 64,G,NZL,BEL,2026-06-27T03:00:00Z,BC Place,CA,scheduled
 65,H,CPV,KSA,2026-06-27T00:00:00Z,NRG Stadium,US,scheduled
