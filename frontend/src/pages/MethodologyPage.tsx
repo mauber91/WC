@@ -19,8 +19,9 @@ export function MethodologyPage() {
           <span className="eyebrow">Model documentation</span>
           <h1>Methodology</h1>
           <p>
-            How match probabilities and tournament forecasts are built. Every quantity below is implemented in the
-            backend and applied consistently across the Matches tab, Monte Carlo simulation, and published bracket.
+            How match probabilities, tournament forecasts, and power rankings are built. Quantities below are
+            implemented in the backend and applied across the Matches tab, Monte Carlo simulation, projected bracket,
+            and Power Rankings.
           </p>
         </div>
       </header>
@@ -39,9 +40,12 @@ export function MethodologyPage() {
         <p>FIFA rank r (1 = best) maps to an Elo-scale prior:</p>
         <Formula>{`E_FIFA(r) = 2200 − 15·r`}</Formula>
         <p>Live tournament Elo E is blended with the FIFA prior and, when available, a WC-champion market-implied Elo E<sub>mkt</sub>:</p>
-        <Formula>{`S = (1 − w_f)·E + w_f·E_FIFA(r)                    (default w_f = 0.12)
-S* = (1 − w_c)·S + w_c·E_mkt(p_champion)         (default w_c = 0.15 when market exists)`}</Formula>
-        <p className="method-note">Elo ratings update after each official result during simulation. Champion-market fusion uses devigged Kalshi / Polymarket WC-winner prices.</p>
+        <Formula>{`S = (1 − w_f)·E + w_f·E_FIFA(r)                    (default w_f = 0.06)
+S* = (1 − w_c)·S + w_c·E_mkt(p_champion)         (default w_c = 0.08 when market exists)`}</Formula>
+        <p className="method-note">
+          Live tournament Elo dominates the blend. WC-winner prices come from devigged Kalshi and Polymarket outright
+          markets (geometric mean when both exist). Elo updates after each official result during simulation.
+        </p>
       </Section>
 
       <Section eyebrow="Match model" title="Expected goals">
@@ -56,6 +60,11 @@ travel_curve(k) = min(k, 3500) / 3500          (defaults: β_rest = 0.06, β_tra
         <p>Expected goals use a shared baseline μ₀ ≈ 1.32 goals per team:</p>
         <Formula>{`λ_A = clip( exp(ln μ₀ + Δ/2), 0.15, 4.5 )
 λ_B = clip( exp(ln μ₀ − Δ/2), 0.15, 4.5 )`}</Formula>
+        <p className="method-note">
+          Host advantage applies <strong>per fixture</strong> when a co-host (Mexico, USA, Canada) plays in its own
+          host country—it is not added permanently to Elo. A team that plays many home venues (e.g. USA in the US) receives
+          the boost again in each of those matches.
+        </p>
       </Section>
 
       <Section eyebrow="Scorelines" title="Score distribution & 1X2">
@@ -69,6 +78,15 @@ P(B wins) = Σ_{i<j} P(i,j)`}</Formula>
       </Section>
 
       <Section eyebrow="Markets" title="Market devigging & calibration">
+        <p>
+          <strong>Fixture 1X2:</strong> Kalshi regulation-time markets (KXWCGAME series) are fetched directly; Attena
+          search supplements Polymarket/Kalshi when available. Quotes with wide bid–ask spreads use last traded price
+          instead of a midpoint.
+        </p>
+        <p>
+          <strong>WC winner:</strong> Kalshi (KXMENWORLDCUP-26) and Polymarket outright prices; inactive or placeholder
+          contracts are excluded.
+        </p>
         <p>Bookmaker decimal odds o<sub>k</sub> are devigged by normalizing implied probabilities:</p>
         <Formula>{`p_k = (1/o_k) / Σ_j (1/o_j)`}</Formula>
         <p>When external market data exists (bookmakers + prediction markets), model and market vectors are combined in log-probability space (a weighted geometric mean, then renormalized):</p>
@@ -89,6 +107,26 @@ p_final,k = q_k / Σ_j q_j                         (default α = 0.85 toward mar
         </ul>
         <Formula>{`P̂(event) = (count of trials where event occurs) / N`}</Formula>
         <p className="method-note">Bracket, group projections, and team forecasts report these empirical frequencies. The published site pins one completed run (iterations N, seed, input cutoff).</p>
+        <p>
+          The <strong>projected bracket</strong> builds one coherent knockout tree: modal group finish per group, official
+          Round-of-32 slot rules (Annex C), then feeder winners through the draw. Advance percentages on each card are
+          conditional on that pairing—e.g. M92 Mexico vs England uses sim results only for trials where both teams arrive
+          via the projected path.
+        </p>
+      </Section>
+
+      <Section eyebrow="Power Rankings" title="Strength & Index">
+        <p><strong>Strength</strong> is fused strength S* (Elo scale) using live tournament Elo and the blends above.</p>
+        <p><strong>Index</strong> ranks teams on a 0–100 scale combining simulation reach and WC-winner markets:</p>
+        <Formula>{`I_sim = 100·P(champion) + 60·P(final) + 35·P(SF) + 20·P(QF) + 10·P(R16) + 5·P(R32)
+
+I_mkt = 100 · (p_champion / max_k p_champion)
+
+Index = (1 − w_m)·I_sim + w_m·I_mkt              (default w_m = 0.30)`}</Formula>
+        <p>
+          <strong>Win WC</strong> and <strong>SF</strong> columns are raw simulation frequencies. Sort order uses Index,
+          then Win WC, then Strength.
+        </p>
       </Section>
 
       <Section eyebrow="Scenario tab" title="What-if bracket (browser only)">
