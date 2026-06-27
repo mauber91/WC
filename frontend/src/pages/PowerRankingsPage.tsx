@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { NavLink } from 'react-router-dom'
 import { api, percent } from '../api/client'
@@ -46,6 +47,43 @@ const SCORE_GUIDE = [
   },
 ] as const
 
+type SortKey = 'rank' | 'team' | 'strength' | 'index' | 'sf' | 'champion'
+
+const SORT_COLUMNS: { key: SortKey; label: string; align?: 'left' | 'right' }[] = [
+  { key: 'rank', label: '#', align: 'left' },
+  { key: 'team', label: 'Team', align: 'left' },
+  { key: 'strength', label: 'Strength', align: 'right' },
+  { key: 'index', label: 'Index', align: 'right' },
+  { key: 'sf', label: 'SF', align: 'right' },
+  { key: 'champion', label: 'Win WC', align: 'right' },
+]
+
+const HOST_TOOLTIP = 'Co-host nation — receives a small model boost when playing at home.'
+
+function sortValue(row: PowerRankingRow, key: SortKey): number | string {
+  switch (key) {
+    case 'rank': return row.rank
+    case 'team': return row.name
+    case 'strength': return row.fused_strength
+    case 'index': return row.power_score
+    case 'sf': return row.semifinal
+    case 'champion': return row.champion
+  }
+}
+
+function compareRows(a: PowerRankingRow, b: PowerRankingRow, key: SortKey, dir: 'asc' | 'desc'): number {
+  const av = sortValue(a, key)
+  const bv = sortValue(b, key)
+  let cmp = 0
+  if (typeof av === 'string' && typeof bv === 'string') {
+    cmp = av.localeCompare(bv)
+  } else {
+    cmp = (av as number) - (bv as number)
+  }
+  if (cmp === 0) cmp = a.name.localeCompare(b.name)
+  return dir === 'asc' ? cmp : -cmp
+}
+
 function PageHeader({ eyebrow, title, detail }: { eyebrow: string; title: string; detail: string }) {
   return (
     <header className="page-header">
@@ -68,18 +106,34 @@ function Loading() {
 
 export function PowerRankingsPage() {
   const { data: latest, isLoading: simLoading } = useLatestSimulation()
+  const [sortKey, setSortKey] = useState<SortKey>('index')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const rankings = useQuery<PowerRankingRow[]>({
     queryKey: ['power-rankings', latest?.id],
     queryFn: () => api(`/simulations/${latest!.id}/power-rankings`),
     enabled: !!latest,
   })
 
+  const sortedRows = useMemo(() => {
+    if (!rankings.data) return []
+    return [...rankings.data].sort((a, b) => compareRows(a, b, sortKey, sortDir))
+  }, [rankings.data, sortKey, sortDir])
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(dir => (dir === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'team' ? 'asc' : 'desc')
+    }
+  }
+
   return (
     <>
       <PageHeader
         eyebrow="Tournament forecast"
         title="Power Rankings"
-        detail="All 48 teams ordered by simulated knockout reach from the published Monte Carlo run."
+        detail="All 48 teams ranked by Index (simulation reach blended with WC-winner markets). Click a column header to sort."
       />
 
       {!latest && !simLoading && <Empty text="Published forecast is not available yet." />}
@@ -108,23 +162,37 @@ export function PowerRankingsPage() {
             <table className="power-rankings-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Team</th>
-                  <th>Strength</th>
-                  <th>Index</th>
-                  <th>SF</th>
-                  <th>Win WC</th>
+                  {SORT_COLUMNS.map(({ key, label, align = 'right' }) => (
+                    <th
+                      key={key}
+                      className={align === 'left' ? 'align-left' : undefined}
+                      aria-sort={sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    >
+                      <button
+                        type="button"
+                        className={`power-rank-sort${sortKey === key ? ' active' : ''}`}
+                        onClick={() => toggleSort(key)}
+                      >
+                        {label}
+                        {sortKey === key && (
+                          <span className="power-rank-sort-mark" aria-hidden>{sortDir === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </button>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {rankings.data.map(row => (
-                  <tr key={row.team_id} className={row.rank <= 8 ? 'power-rank-top' : undefined}>
-                    <td><span className="power-rank-no">{row.rank}</span></td>
+                {sortedRows.map((row, index) => (
+                  <tr key={row.team_id} className={index < 8 ? 'power-rank-top' : undefined}>
+                    <td><span className="power-rank-no">{index + 1}</span></td>
                     <td className="team-name">
                       <NavLink className="team-link power-rank-team" to={teamPath({ name: row.name })}>
                         <span aria-hidden>{flagEmoji(row.fifa_code)}</span>
                         <span>{row.name}</span>
-                        {row.is_host && <small className="power-rank-host">Host</small>}
+                        {row.is_host && (
+                          <small className="power-rank-host" title={HOST_TOOLTIP}>Host</small>
+                        )}
                       </NavLink>
                     </td>
                     <td><strong>{row.fused_strength}</strong></td>
