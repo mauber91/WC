@@ -28,11 +28,11 @@ type Triple = { team_a: number; draw: number; team_b: number }
 type MatchPrediction = { data_quality: string; lambda_a: number; lambda_b: number; final: Triple; model: Triple; market: Triple | null; score_distribution: number[][] }
 type ImportPreview = { id: string; record_count: number; status: string; errors: { row: number; message: string }[] }
 
-type NavItem = { to: string; label: string; activePrefix?: string }
+type NavItem = { to: string; label: string; activePrefix?: string; featured?: boolean }
 
 const forecastNav: NavItem[] = [
   { to: '/bracket', label: 'Bracket', activePrefix: '/bracket' },
-  { to: '/rankings', label: 'Rankings', activePrefix: '/rankings' },
+  { to: '/rankings', label: 'Power Rankings', activePrefix: '/rankings', featured: true },
   { to: '/groups/A', label: 'Groups', activePrefix: '/groups' },
   { to: '/matches', label: 'Matches', activePrefix: '/matches' },
   { to: '/teams', label: 'Teams', activePrefix: '/teams' },
@@ -60,15 +60,19 @@ function SidebarNav({ items, sectionLabel, onNavigate }: { items: NavItem[]; sec
     <div className="sidebar-nav-section">
       {sectionLabel && <span className="sidebar-section-label">{sectionLabel}</span>}
       <nav>
-        {items.map(({ to, label, activePrefix }) => {
+        {items.map(({ to, label, activePrefix, featured }) => {
           const active = activePrefix ? location.pathname.startsWith(activePrefix) : undefined
           return (
             <NavLink
               key={to}
               to={to}
               onClick={onNavigate}
-              className={activePrefix ? (active ? 'active' : '') : ({ isActive }) => isActive ? 'active' : ''}
+              className={({ isActive }) => {
+                const activeClass = activePrefix ? (active ? 'active' : '') : (isActive ? 'active' : '')
+                return [activeClass, featured ? 'nav-featured' : ''].filter(Boolean).join(' ')
+              }}
             >
+              {featured && <span className="nav-featured-mark" aria-hidden>▴</span>}
               {label}
             </NavLink>
           )
