@@ -9,6 +9,7 @@ import { TeamPageView } from './components/TeamPage'
 import { isPublishedMode } from './config/appMode'
 import { ManualScenarioPage } from './features/manualScenario/ManualScenarioPage'
 import { MethodologyPage } from './pages/MethodologyPage'
+import { PowerRankingsPage } from './pages/PowerRankingsPage'
 import { useLatestSimulation, useRuns, type SimulationRun } from './hooks/useLatestSimulation'
 import { flagEmoji } from './lib/flags'
 import { teamPath } from './lib/teamSlug'
@@ -31,6 +32,7 @@ type NavItem = { to: string; label: string; activePrefix?: string }
 
 const forecastNav: NavItem[] = [
   { to: '/bracket', label: 'Bracket', activePrefix: '/bracket' },
+  { to: '/rankings', label: 'Rankings', activePrefix: '/rankings' },
   { to: '/groups/A', label: 'Groups', activePrefix: '/groups' },
   { to: '/matches', label: 'Matches', activePrefix: '/matches' },
   { to: '/teams', label: 'Teams', activePrefix: '/teams' },
@@ -107,6 +109,7 @@ function App() {
       <Route path="/scenario" element={<ManualScenarioPage />} />
       <Route path="/methodology" element={<MethodologyPage />} />
       <Route path="/bracket" element={<BracketPage />} />
+      <Route path="/rankings" element={<PowerRankingsPage />} />
       <Route path="/teams" element={<TeamsPage />} />
       <Route path="/teams/:slug" element={<TeamPage />} />
       {!isPublishedMode && <Route path="/admin/data" element={<AdminPage />} />}

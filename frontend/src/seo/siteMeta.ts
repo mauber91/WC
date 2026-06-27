@@ -8,6 +8,7 @@ export const DEFAULT_SITE_URL = 'https://wc-forecast.pages.dev'
 export const SITEMAP_PATHS = [
   '/',
   '/bracket',
+  '/rankings',
   '/groups/A',
   '/matches',
   '/teams',
@@ -20,6 +21,7 @@ export const ROUTE_PAGE_TITLES: Array<{ prefix: string; title: string }> = [
   { prefix: '/teams/', title: 'Team' },
   { prefix: '/groups/', title: 'Group' },
   { prefix: '/bracket', title: 'Projected bracket' },
+  { prefix: '/rankings', title: 'Power rankings' },
   { prefix: '/matches', title: 'Match predictions' },
   { prefix: '/teams', title: 'Teams' },
   { prefix: '/methodology', title: 'Methodology' },

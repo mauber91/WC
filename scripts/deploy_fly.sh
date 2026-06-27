@@ -135,8 +135,9 @@ fi
 
 if [[ "$SKIP_DB_UPLOAD" -eq 0 ]]; then
   echo "==> Uploading published database to /data/app/worldcup.db"
-  fly ssh console --app "$APP" -C "rm -f /data/app/worldcup.db /data/app/worldcup.db-wal /data/app/worldcup.db-shm"
-  fly ssh sftp put "$DB_FILE" /data/app/worldcup.db --app "$APP"
+  # flyctl sftp refuses to overwrite; upload to a temp name then swap atomically.
+  fly ssh sftp put "$DB_FILE" /data/app/worldcup.db.new --app "$APP"
+  fly ssh console --app "$APP" -C "sh -c 'rm -f /data/app/worldcup.db /data/app/worldcup.db-wal /data/app/worldcup.db-shm && mv /data/app/worldcup.db.new /data/app/worldcup.db'"
   echo "==> Restarting app to pick up database"
   fly apps restart "$APP"
 fi

@@ -21,6 +21,7 @@ from world_cup_api.services.champion_market_sync import sync_wc_champion_markets
 from world_cup_api.services.market_sync import sync_upcoming_markets
 from world_cup_api.services.tournament_refresh import refresh_tournament_data
 from world_cup_api.services.simulation_coverage import compute_result_coverage
+from world_cup_api.services.power_rankings import power_rankings
 from world_cup_api.services.simulations import create_simulation
 from world_cup_api.domain.teams import team_slug
 from world_cup_api.services.teams import resolve_team, team_detail
@@ -231,6 +232,18 @@ def simulation_teams(simulation_id: str, db: Session = Depends(get_db), settings
     rows = db.execute(select(SimulationTeamResult, Team).join(Team, Team.id == SimulationTeamResult.team_id).where(
         SimulationTeamResult.simulation_id == simulation_id)).all()
     return [{**_team_probability(row, run), "name": team.name, "fifa_code": team.fifa_code} for row, team in rows]
+
+
+@router.get("/simulations/{simulation_id}/power-rankings")
+def simulation_power_rankings(
+    simulation_id: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> list[dict]:
+    run = _run_or_404(db, simulation_id, settings)
+    if run.status != "completed":
+        raise HTTPException(409, "Simulation is not completed")
+    return power_rankings(db, run)
 
 
 @router.get("/simulations/{simulation_id}/groups")
