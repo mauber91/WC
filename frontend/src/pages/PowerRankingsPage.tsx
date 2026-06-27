@@ -49,7 +49,7 @@ const SCORE_GUIDE = [
 
 type SortKey = 'rank' | 'team' | 'strength' | 'index' | 'sf' | 'champion'
 
-const SORT_COLUMNS: { key: SortKey; label: string; align?: 'left' | 'right' }[] = [
+const SORT_COLUMNS: { key: SortKey; label: string; align: 'left' | 'right' }[] = [
   { key: 'rank', label: '#', align: 'left' },
   { key: 'team', label: 'Team', align: 'left' },
   { key: 'strength', label: 'Strength', align: 'right' },
@@ -162,15 +162,15 @@ export function PowerRankingsPage() {
             <table className="power-rankings-table">
               <thead>
                 <tr>
-                  {SORT_COLUMNS.map(({ key, label, align = 'right' }) => (
+                  {SORT_COLUMNS.map(({ key, label, align }) => (
                     <th
                       key={key}
-                      className={align === 'left' ? 'align-left' : undefined}
+                      className={align === 'left' ? 'power-rank-col-left' : 'power-rank-col-num'}
                       aria-sort={sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                     >
                       <button
                         type="button"
-                        className={`power-rank-sort${sortKey === key ? ' active' : ''}`}
+                        className={`power-rank-sort${sortKey === key ? ' active' : ''}${align === 'right' ? ' power-rank-sort-end' : ''}`}
                         onClick={() => toggleSort(key)}
                       >
                         {label}
@@ -185,8 +185,8 @@ export function PowerRankingsPage() {
               <tbody>
                 {sortedRows.map((row, index) => (
                   <tr key={row.team_id} className={index < 8 ? 'power-rank-top' : undefined}>
-                    <td><span className="power-rank-no">{index + 1}</span></td>
-                    <td className="team-name">
+                    <td className="power-rank-col-left"><span className="power-rank-no">{index + 1}</span></td>
+                    <td className="team-name power-rank-col-left">
                       <NavLink className="team-link power-rank-team" to={teamPath({ name: row.name })}>
                         <span aria-hidden>{flagEmoji(row.fifa_code)}</span>
                         <span>{row.name}</span>
@@ -195,10 +195,10 @@ export function PowerRankingsPage() {
                         )}
                       </NavLink>
                     </td>
-                    <td><strong>{row.fused_strength}</strong></td>
-                    <td>{row.power_score.toFixed(1)}</td>
-                    <td>{percent(row.semifinal)}</td>
-                    <td><strong>{percent(row.champion)}</strong></td>
+                    <td className="power-rank-col-num"><strong>{row.fused_strength}</strong></td>
+                    <td className="power-rank-col-num">{row.power_score.toFixed(1)}</td>
+                    <td className="power-rank-col-num">{percent(row.semifinal)}</td>
+                    <td className="power-rank-col-num"><strong>{percent(row.champion)}</strong></td>
                   </tr>
                 ))}
               </tbody>
