@@ -16,8 +16,8 @@ class ContextParams:
     rotation_elo_eliminated: float = 40.0
     collusion_draw_boost: float = 0.18
     goal_dispersion: float = 0.15
-    fifa_strength_weight: float = 0.12
-    champion_strength_weight: float = 0.15
+    fifa_strength_weight: float = 0.06
+    champion_strength_weight: float = 0.08
     champion_field_size: int = 48
     market_blend_alpha: float = 0.85
     clinch_points: int = 6

@@ -1,7 +1,9 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1'
+const ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY as string | undefined
 
 export async function api<T = unknown>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
+  if (path.startsWith('/admin') && ADMIN_KEY) headers.set('X-Admin-Key', ADMIN_KEY)
   if (init?.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers })
   if (!response.ok) {

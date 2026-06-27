@@ -1,6 +1,7 @@
 from world_cup_api.domain.champion_markets import (
     build_fifa_label_index,
     champion_probability_to_elo,
+    is_placeholder_champion_label,
     match_champion_label,
     normalize_champion_probabilities,
     parse_polymarket_team_label,
@@ -19,6 +20,12 @@ class _Team:
 def test_parse_polymarket_team_label() -> None:
     assert parse_polymarket_team_label("Will France win the 2026 FIFA World Cup?") == "France"
     assert parse_polymarket_team_label("Will Team AM win the 2026 FIFA World Cup?") == "Team AM"
+
+
+def test_is_placeholder_champion_label() -> None:
+    assert is_placeholder_champion_label("Team AM")
+    assert is_placeholder_champion_label("Any Other Team")
+    assert not is_placeholder_champion_label("France")
 
 
 def test_match_champion_label_handles_aliases() -> None:

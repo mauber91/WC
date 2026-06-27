@@ -57,6 +57,7 @@ CHAMPION_LABEL_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 _POLYMARKET_QUESTION = re.compile(r"^Will (.+?) win the 2026 FIFA World Cup\?$", re.IGNORECASE)
+_PLACEHOLDER_TEAM = re.compile(r"^team [a-z]{2}$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,11 @@ def parse_polymarket_team_label(question: str) -> str | None:
     if match is None:
         return None
     return match.group(1).strip()
+
+
+def is_placeholder_champion_label(label: str) -> bool:
+    normalized = _normalize_label(label)
+    return bool(_PLACEHOLDER_TEAM.match(normalized)) or normalized in {"any other team", "other"}
 
 
 def match_champion_label(label: str, label_index: dict[str, str]) -> str | None:

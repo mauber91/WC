@@ -7,8 +7,13 @@ from sqlalchemy import select
 
 from world_cup_api.db.models import Match, PredictionMarketPrice, Team, Tournament
 from world_cup_api.ingestion.attena import AttenaMarketResult
-from world_cup_api.ingestion.kalshi import KalshiMarketQuote
-from world_cup_api.services.market_sync import _map_selection, sync_upcoming_markets
+from world_cup_api.ingestion.kalshi import KalshiEvent, KalshiMarketQuote
+from world_cup_api.services.market_sync import (
+    _event_title_matches_teams,
+    _find_kxwcgame_event_ticker,
+    _map_selection,
+    sync_upcoming_markets,
+)
 
 
 def test_map_selection_handles_kalshi_labels() -> None:
@@ -67,7 +72,8 @@ def test_sync_match_stores_kalshi_quotes_from_attena_and_enrichment(db_session) 
     ]
 
     with patch("world_cup_api.services.market_sync.search_markets", return_value=attena_rows), \
-         patch("world_cup_api.services.market_sync.fetch_event_markets", return_value=kalshi_rows):
+         patch("world_cup_api.services.market_sync.fetch_event_markets", return_value=kalshi_rows), \
+         patch("world_cup_api.services.market_sync.fetch_series_events", return_value=[]):
         reports = sync_upcoming_markets(db_session, match_numbers=[33])
 
     assert len(reports) == 1
@@ -78,3 +84,13 @@ def test_sync_match_stores_kalshi_quotes_from_attena_and_enrichment(db_session) 
     assert len(rows) == 3
     assert {row.platform for row in rows} == {"kalshi"}
     assert abs(sum(row.yes_price for row in rows) - 1.0) < 1e-6
+
+
+def test_find_kxwcgame_event_ticker_matches_team_names() -> None:
+    team_a = Team(fifa_code="ALG", name="Algeria", short_name="Algeria")
+    team_b = Team(fifa_code="AUT", name="Austria", short_name="Austria")
+    events = [KalshiEvent("KXWCGAME-26JUN27DZAAUT", "Algeria vs Austria")]
+    assert _find_kxwcgame_event_ticker(team_a, team_b, events) == "KXWCGAME-26JUN27DZAAUT"
+    assert _event_title_matches_teams("Panama vs England: Regulation Time Moneyline",
+                                      Team(fifa_code="PAN", name="Panama", short_name="Panama"),
+                                      Team(fifa_code="ENG", name="England", short_name="England"))

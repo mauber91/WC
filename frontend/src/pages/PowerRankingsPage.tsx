@@ -30,7 +30,7 @@ export type PowerRankingRow = {
 const SCORE_GUIDE = [
   {
     term: 'Strength',
-    detail: 'Pre-tournament rating on the Elo scale: live tournament Elo blended with FIFA rank and WC winner market prices.',
+    detail: 'Pre-tournament rating on the Elo scale: mostly live tournament Elo (results so far), with smaller blends from FIFA rank and WC winner markets.',
   },
   {
     term: 'Index',

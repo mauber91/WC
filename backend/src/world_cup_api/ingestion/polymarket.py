@@ -8,7 +8,12 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from world_cup_api.config import get_settings
-from world_cup_api.domain.champion_markets import ChampionQuote, parse_polymarket_team_label
+from world_cup_api.domain.champion_markets import (
+    ChampionQuote,
+    is_placeholder_champion_label,
+    parse_polymarket_team_label,
+)
+from world_cup_api.ingestion.quote_prices import reliable_yes_price
 
 
 @dataclass(frozen=True)
@@ -42,9 +47,11 @@ def fetch_wc_winner_quotes(*, event_slug: str = "world-cup-winner") -> list[Cham
 
 
 def _parse_market(row: dict[str, Any], *, event_slug: str) -> ChampionQuote | None:
+    if row.get("active") is False:
+        return None
     question = row.get("question") or row.get("title") or ""
     team_label = parse_polymarket_team_label(question)
-    if team_label is None:
+    if team_label is None or is_placeholder_champion_label(team_label):
         return None
     yes_price = _yes_price(row)
     if yes_price is None:
@@ -66,17 +73,16 @@ def _yes_price(row: dict[str, Any]) -> float | None:
             prices = None
     if isinstance(prices, list) and prices:
         try:
-            return float(prices[0])
+            value = float(prices[0])
+            if value > 0:
+                return value
         except (TypeError, ValueError):
-            return None
-    best_bid = _to_float(row.get("bestBid"))
-    best_ask = _to_float(row.get("bestAsk"))
-    if best_bid is not None and best_ask is not None:
-        return (best_bid + best_ask) / 2
-    last = _to_float(row.get("lastTradePrice"))
-    if last is not None:
-        return last
-    return None
+            pass
+    return reliable_yes_price(
+        yes_bid=_to_float(row.get("bestBid")),
+        yes_ask=_to_float(row.get("bestAsk")),
+        last=_to_float(row.get("lastTradePrice")),
+    )
 
 
 def _to_float(value: Any) -> float | None:

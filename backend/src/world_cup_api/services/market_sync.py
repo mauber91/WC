@@ -9,7 +9,12 @@ from sqlalchemy.orm import Session
 
 from world_cup_api.db.models import Match, PredictionMarketPrice, Team
 from world_cup_api.ingestion.attena import AttenaMarketResult, search_markets
-from world_cup_api.ingestion.kalshi import KalshiMarketQuote, fetch_event_markets
+from world_cup_api.ingestion.kalshi import (
+    KXWCGAME_SERIES,
+    KalshiMarketQuote,
+    fetch_event_markets,
+    fetch_series_events,
+)
 
 
 TEAM_SEARCH_ALIASES: dict[str, tuple[str, ...]] = {
@@ -57,6 +62,7 @@ def sync_upcoming_markets(db: Session, *, match_numbers: list[int] | None = None
         wanted = set(match_numbers)
         matches = [match for match in matches if match.official_match_number in wanted]
     reports: list[MatchSyncReport] = []
+    kxwcgame_events: list | None = None
     for match in matches:
         if match.team_a_id is None or match.team_b_id is None:
             continue
@@ -64,12 +70,23 @@ def sync_upcoming_markets(db: Session, *, match_numbers: list[int] | None = None
         team_b = db.get(Team, match.team_b_id)
         if team_a is None or team_b is None:
             continue
-        reports.append(_sync_match(db, match, team_a, team_b))
+        if kxwcgame_events is None:
+            try:
+                kxwcgame_events = fetch_series_events(KXWCGAME_SERIES)
+            except RuntimeError:
+                kxwcgame_events = []
+        reports.append(_sync_match(db, match, team_a, team_b, kxwcgame_events))
     db.commit()
     return reports
 
 
-def _sync_match(db: Session, match: Match, team_a: Team, team_b: Team) -> MatchSyncReport:
+def _sync_match(
+    db: Session,
+    match: Match,
+    team_a: Team,
+    team_b: Team,
+    kxwcgame_events: list,
+) -> MatchSyncReport:
     queries = _build_queries(team_a, team_b, match.scheduled_at)
     attena_results: dict[tuple[str, str], AttenaMarketResult] = {}
     warnings: list[str] = []
@@ -84,6 +101,7 @@ def _sync_match(db: Session, match: Match, team_a: Team, team_b: Team) -> MatchS
 
     quotes = _quotes_from_attena(attena_results.values(), team_a, team_b, warnings)
     quotes.extend(_quotes_from_kalshi_enrichment(attena_results.values(), team_a, team_b, warnings))
+    quotes.extend(_quotes_from_kxwcgame_event(team_a, team_b, kxwcgame_events, warnings))
 
     deduped = _dedupe_quotes(quotes)
     snapshot_at = datetime.now(timezone.utc)
@@ -146,10 +164,14 @@ def _result_matches_match(result: AttenaMarketResult, team_a: Team, team_b: Team
 def _quotes_from_attena(results: list[AttenaMarketResult], team_a: Team, team_b: Team,
                           warnings: list[str]) -> list[MarketQuote]:
     quotes: list[MarketQuote] = []
+    if not results:
+        return quotes
+    mapped = False
     for result in results:
         selection = _map_selection(result.outcome_label or result.title, team_a, team_b)
         if selection is None:
             continue
+        mapped = True
         quotes.append(MarketQuote(
             platform=result.source,
             external_market_id=_event_id(result),
@@ -161,9 +183,45 @@ def _quotes_from_attena(results: list[AttenaMarketResult], team_a: Team, team_b:
             volume=result.volume_24h or result.volume,
             source_url=result.source_url,
         ))
-    if not quotes:
+    if not mapped:
         warnings.append("No Attena results mapped to 1X2 selections")
     return quotes
+
+
+def _quotes_from_kxwcgame_event(
+    team_a: Team,
+    team_b: Team,
+    events: list,
+    warnings: list[str],
+) -> list[MarketQuote]:
+    event_ticker = _find_kxwcgame_event_ticker(team_a, team_b, events)
+    if event_ticker is None:
+        return []
+    try:
+        markets = fetch_event_markets(event_ticker)
+    except RuntimeError as exc:
+        warnings.append(str(exc))
+        return []
+    return _quotes_from_kalshi_markets(markets, team_a, team_b)
+
+
+def _find_kxwcgame_event_ticker(team_a: Team, team_b: Team, events: list) -> str | None:
+    for event in events:
+        title = getattr(event, "title", "") or ""
+        if _event_title_matches_teams(title, team_a, team_b):
+            return getattr(event, "event_ticker", None)
+    return None
+
+
+def _event_title_matches_teams(title: str, team_a: Team, team_b: Team) -> bool:
+    parts = re.split(r"\s+vs\.?\s+", title, maxsplit=1, flags=re.IGNORECASE)
+    if len(parts) != 2:
+        return False
+    left, right = parts[0].strip().lower(), re.sub(r":.*$", "", parts[1]).strip().lower()
+    return (
+        (_name_in_text(team_a, left) and _name_in_text(team_b, right))
+        or (_name_in_text(team_a, right) and _name_in_text(team_b, left))
+    )
 
 
 def _quotes_from_kalshi_enrichment(results: list[AttenaMarketResult], team_a: Team, team_b: Team,

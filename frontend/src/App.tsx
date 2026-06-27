@@ -27,6 +27,10 @@ type Projection = { teams: TeamForecast[] }
 type Triple = { team_a: number; draw: number; team_b: number }
 type MatchPrediction = { data_quality: string; lambda_a: number; lambda_b: number; final: Triple; model: Triple; market: Triple | null; score_distribution: number[][] }
 type ImportPreview = { id: string; record_count: number; status: string; errors: { row: number; message: string }[] }
+type MarketSyncReport = {
+  fixtures: Array<{ match_id: number; match_number: number; stored_rows: number; platforms: string[]; warnings: string[] }>
+  wc_winner: { teams_matched: number; stored_rows: number; platforms: string[]; top_favorites: Array<{ fifa_code: string; probability: number }>; warnings: string[] }
+}
 
 type NavItem = { to: string; label: string; activePrefix?: string; featured?: boolean }
 
@@ -368,12 +372,26 @@ function TeamPage() {
 function AdminPage() {
   const client = useQueryClient(); const matches = useQuery<Match[]>({ queryKey: ['matches'], queryFn: () => api('/matches') })
   const [matchId, setMatchId] = useState(''); const [a, setA] = useState(0); const [b, setB] = useState(0); const [file, setFile] = useState<File>(); const [dataset, setDataset] = useState('results'); const [preview, setPreview] = useState<ImportPreview>()
+  const [marketSyncMatch, setMarketSyncMatch] = useState(''); const [marketSyncReport, setMarketSyncReport] = useState<MarketSyncReport>()
   const resultMutation = useMutation({ mutationFn: () => api(`/admin/matches/${matchId}/result`, { method:'PUT', body:JSON.stringify({ team_a_goals_90:a, team_b_goals_90:b, team_a_yellows:0, team_b_yellows:0, team_a_indirect_reds:0, team_b_indirect_reds:0, team_a_direct_reds:0, team_b_direct_reds:0, team_a_yellow_direct_reds:0, team_b_yellow_direct_reds:0 }) }), onSuccess: () => client.invalidateQueries() })
+  const marketSyncMutation = useMutation({
+    mutationFn: () => {
+      const query = marketSyncMatch ? `?match_number=${encodeURIComponent(marketSyncMatch)}` : ''
+      return api<MarketSyncReport>(`/admin/markets/sync${query}`, { method: 'POST' })
+    },
+    onSuccess: (report) => { setMarketSyncReport(report); client.invalidateQueries() },
+  })
   async function upload() { if (!file) return; const form = new FormData(); form.append('file', file); form.append('source','manual-csv'); setPreview(await api<ImportPreview>(`/admin/imports/${dataset}/preview`, { method:'POST', body:form })) }
   async function commit() { if (!preview) return; await api(`/admin/imports/${preview.id}/commit`, { method:'POST' }); setPreview(undefined); client.invalidateQueries() }
+  const fixtureRows = marketSyncReport?.fixtures.reduce((sum, row) => sum + row.stored_rows, 0) ?? 0
+  const syncWarnings = [
+    ...(marketSyncReport?.fixtures.flatMap(row => row.warnings) ?? []),
+    ...(marketSyncReport?.wc_winner.warnings ?? []),
+  ]
   return <><PageHeader eyebrow="Data operations" title="Admin workspace" detail="Validate imports before committing them. Result corrections create a new immutable revision." />
     <div className="two-col"><section className="card form-card"><span className="eyebrow">Manual result</span><h2>Record a final score</h2><label>Fixture<select value={matchId} onChange={e=>setMatchId(e.target.value)}><option value="">Select match</option>{matches.data?.map(match=><option value={match.id} key={match.id}>M{match.official_match_number} · {match.team_a.name} vs {match.team_b.name}</option>)}</select></label><div className="score-input"><input type="number" min="0" value={a} onChange={e=>setA(Number(e.target.value))}/><span>—</span><input type="number" min="0" value={b} onChange={e=>setB(Number(e.target.value))}/></div><button className="button primary" disabled={!matchId || resultMutation.isPending} onClick={()=>resultMutation.mutate()}>Save revision</button></section>
-      <section className="card form-card"><span className="eyebrow">CSV ingestion</span><h2>Preview an import</h2><label>Dataset<select value={dataset} onChange={e=>setDataset(e.target.value)}>{['teams','fixtures','results','ratings','bookmaker_odds','prediction_markets'].map(value=><option key={value}>{value}</option>)}</select></label><label className="file-input"><input type="file" accept=".csv" onChange={e=>setFile(e.target.files?.[0])}/><span>{file?.name ?? 'Choose CSV file'}</span></label><button className="button ghost" disabled={!file} onClick={upload}>Validate file</button>{preview && <div className="preview"><strong>{preview.record_count} rows · {preview.status}</strong>{preview.errors.map(error=><small key={error.row}>{error.message}</small>)}{preview.status==='validated'&&<button className="button primary" onClick={commit}>Commit import</button>}</div>}</section></div>
+      <section className="card form-card"><span className="eyebrow">CSV ingestion</span><h2>Preview an import</h2><label>Dataset<select value={dataset} onChange={e=>setDataset(e.target.value)}>{['teams','fixtures','results','ratings','bookmaker_odds','prediction_markets'].map(value=><option key={value}>{value}</option>)}</select></label><label className="file-input"><input type="file" accept=".csv" onChange={e=>setFile(e.target.files?.[0])}/><span>{file?.name ?? 'Choose CSV file'}</span></label><button className="button ghost" disabled={!file} onClick={upload}>Validate file</button>{preview && <div className="preview"><strong>{preview.record_count} rows · {preview.status}</strong>{preview.errors.map(error=><small key={error.row}>{error.message}</small>)}{preview.status==='validated'&&<button className="button primary" onClick={commit}>Commit import</button>}</div>}</section>
+      <section className="card form-card"><span className="eyebrow">Prediction markets</span><h2>Sync Polymarket &amp; Kalshi</h2><p><small>Fetch 1X2 quotes for upcoming group fixtures and WC winner prices via Attena/Kalshi.</small></p><label>Fixture <small>(optional)</small><select value={marketSyncMatch} onChange={e=>setMarketSyncMatch(e.target.value)}><option value="">All upcoming group matches</option>{matches.data?.filter(match => match.status !== 'final').map(match=><option value={match.official_match_number} key={match.id}>M{match.official_match_number} · {match.team_a.name} vs {match.team_b.name}</option>)}</select></label><button className="button primary" disabled={marketSyncMutation.isPending} onClick={()=>marketSyncMutation.mutate()}>{marketSyncMutation.isPending ? 'Syncing…' : 'Sync markets'}</button>{marketSyncMutation.isError && <div className="warning">{marketSyncMutation.error.message}</div>}{marketSyncReport && <div className="preview"><strong>{fixtureRows} fixture rows · {marketSyncReport.wc_winner.stored_rows} WC winner rows</strong><small>{marketSyncReport.fixtures.length} fixtures · {marketSyncReport.wc_winner.teams_matched} teams matched</small>{marketSyncReport.wc_winner.top_favorites.length > 0 && <small>Top: {marketSyncReport.wc_winner.top_favorites.map(team => `${team.fifa_code} ${percent(team.probability, 1)}`).join(' · ')}</small>}{syncWarnings.map(warning => <small key={warning}>{warning}</small>)}</div>}</section></div>
   </>
 }
 
