@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,12 +10,12 @@ from world_cup_api.api.dependencies import require_admin
 from world_cup_api.api.schemas import ResultInput, SimulationInput, SimulationStatus
 from world_cup_api.config import Settings, get_settings
 from world_cup_api.db.models import (
-    BookmakerOdds, Group, PredictionMarketPrice, Simulation, SimulationBracketResult,
+    BookmakerOdds, Group, Match, PredictionMarketPrice, Simulation, SimulationBracketResult,
     SimulationGroupResult, SimulationTeamR32Rival, SimulationTeamResult, Team, TournamentTeam, IngestionRun,
 )
 from world_cup_api.db.session import get_db
 from world_cup_api.jobs.scheduler import schedule_simulation
-from world_cup_api.services.predictions import forecast_match
+from world_cup_api.services.predictions import forecast_match, forecast_matches
 from world_cup_api.services.results import remove_current_result, revise_result
 from world_cup_api.services.champion_market_sync import sync_wc_champion_markets
 from world_cup_api.services.market_sync import sync_upcoming_markets
@@ -113,6 +113,20 @@ def matches(group: str | None = None, db: Session = Depends(get_db)) -> list[dic
     return list_matches(db, group)
 
 
+@router.get("/matches/predictions")
+def match_predictions(
+    match_ids: list[int] | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> dict[int, dict]:
+    ids = match_ids
+    if ids is None:
+        ids = list(db.scalars(select(Match.id).where(Match.team_a_id.is_not(None), Match.team_b_id.is_not(None))))
+    return {
+        match_id: _match_prediction_payload(match, forecast, sources, has_external_market)
+        for match_id, (match, forecast, sources, has_external_market) in forecast_matches(db, ids).items()
+    }
+
+
 @router.get("/matches/{match_id}")
 def match_detail(match_id: int, db: Session = Depends(get_db)) -> dict:
     found = next((item for item in list_matches(db) if item["id"] == match_id), None)
@@ -127,11 +141,7 @@ def match_prediction(match_id: int, db: Session = Depends(get_db)) -> dict:
         match, forecast, sources, has_external_market = forecast_match(db, match_id)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
-    return {"match_id": match.id, "generated_at": datetime.now(timezone.utc), "model_version": "nbinom-fused-strength-v1",
-            "lambda_a": forecast.lambda_a, "lambda_b": forecast.lambda_b,
-            "market": _triple(forecast.market), "model": _triple(forecast.model), "final": _triple(forecast.final),
-            "score_distribution": forecast.score_matrix, "market_sources": sources,
-            "data_quality": "market_blend" if has_external_market else "model_only"}
+    return _match_prediction_payload(match, forecast, sources, has_external_market)
 
 
 @router.get("/matches/{match_id}/odds")
@@ -346,6 +356,14 @@ def data_freshness(db: Session = Depends(get_db)) -> list[dict]:
         output.append({"dataset_type": dataset, "fresh_at": latest.source_cutoff_at if latest else None,
                        "status": latest.status if latest else "never_imported"})
     return output
+
+
+def _match_prediction_payload(match, forecast, sources: list[dict], has_external_market: bool) -> dict:
+    return {"match_id": match.id, "generated_at": datetime.now(timezone.utc), "model_version": "nbinom-fused-strength-v1",
+            "lambda_a": forecast.lambda_a, "lambda_b": forecast.lambda_b,
+            "market": _triple(forecast.market), "model": _triple(forecast.model), "final": _triple(forecast.final),
+            "score_distribution": forecast.score_matrix, "market_sources": sources,
+            "data_quality": "market_blend" if has_external_market else "model_only"}
 
 
 def _standing_dict(row) -> dict:

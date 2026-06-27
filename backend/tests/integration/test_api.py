@@ -49,6 +49,17 @@ def test_prediction_contract() -> None:
         assert sum(response.json()["final"].values()) == pytest.approx(1.0)
 
 
+def test_batch_prediction_contract() -> None:
+    with TestClient(app) as client:
+        matches = client.get("/api/v1/matches").json()[:3]
+        params = [("match_ids", match["id"]) for match in matches]
+        response = client.get("/api/v1/matches/predictions", params=params)
+        assert response.status_code == 200
+        payload = response.json()
+        assert set(payload) == {str(match["id"]) for match in matches}
+        assert all(sum(row["final"].values()) == pytest.approx(1.0) for row in payload.values())
+
+
 def _seeded_upcoming_market_fixture() -> tuple[int, set[str], set[str]]:
     seed_dir = ROOT_DIR / "data" / "seed"
     with (seed_dir / "results.csv").open(newline="", encoding="utf-8-sig") as handle:

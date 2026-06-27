@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { NavLink } from 'react-router-dom'
 import { api, percent } from '../api/client'
 import { flagEmoji } from '../lib/flags'
@@ -266,15 +266,15 @@ export function TeamPageView({
   })
 
   const upcoming = team.data?.fixtures.filter(match => !match.result) ?? []
-  const predictions = useQueries({
-    queries: upcoming.map(match => ({
-      queryKey: ['match-prediction', match.id],
-      queryFn: () => api<MatchPrediction>(`/matches/${match.id}/prediction`),
-    })),
+  const matchIds = upcoming.map(match => match.id)
+  const predictions = useQuery<Record<string, MatchPrediction>>({
+    queryKey: ['match-predictions', matchIds],
+    queryFn: () => api<Record<string, MatchPrediction>>(`/matches/predictions?${matchIds.map(id => `match_ids=${id}`).join('&')}`),
+    enabled: matchIds.length > 0,
   })
 
   const predictionByMatchId = new Map(
-    upcoming.map((match, index) => [match.id, predictions[index]?.data]),
+    Object.entries(predictions.data ?? {}).map(([matchId, prediction]) => [Number(matchId), prediction]),
   )
 
   const groupOutcomes = forecast.data ? [

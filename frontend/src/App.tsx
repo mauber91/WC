@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, percent } from './api/client'
 import { BracketBoard, type BracketRow } from './components/BracketBoard'
@@ -143,7 +143,7 @@ function GroupPage() {
       {standings.isLoading ? <Loading /> : <table className="standings"><thead><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead><tbody>{standings.data?.rows.map(row => <tr key={row.team_id}><td><span className={`rank rank-${row.position}`}>{row.position}</span></td><td className="team-name"><NavLink className="team-link" to={teamPath({ name: row.name })}>{row.name}</NavLink></td><td>{row.played}</td><td>{row.won}</td><td>{row.drawn}</td><td>{row.lost}</td><td>{row.goal_difference > 0 ? '+' : ''}{row.goal_difference}</td><td><strong>{row.points}</strong></td></tr>)}</tbody></table>}
     </section>
     <section className="card"><div className="card-head"><div><span className="eyebrow">Projection</span><h2>How the group may finish</h2></div><span className="meta">{latest ? `${latest.iterations.toLocaleString()} simulations` : isPublishedMode ? 'Awaiting published forecast' : 'Run a simulation to populate'}</span></div>
-      {projection.data ? <div className="prob-grid">{projection.data.teams.sort((a, b) => b.win_group - a.win_group).map(team => {
+      {projection.data ? <div className="prob-grid">{[...projection.data.teams].sort((a, b) => b.win_group - a.win_group).map(team => {
         const name = teamById.get(team.team_id)?.name ?? `Team ${team.team_id}`
         return <div className="prob-row" key={team.team_id}><NavLink className="team-link" to={teamPath({ name })}>{name}</NavLink><Probability label="Win group" value={team.win_group} /><Probability label="Top two" value={team.top_two} /><Probability label="Advance third" value={team.advance_as_third} /><Probability label="Eliminated" value={team.eliminated} tone="danger" /></div>
       })}</div> : <Empty text={isPublishedMode ? 'Published forecast is not available yet.' : 'No completed simulation yet.'} />}
@@ -154,16 +154,15 @@ function GroupPage() {
 function MatchesPage() {
   const navigate = useNavigate()
   const matches = useQuery<Match[]>({ queryKey: ['matches'], queryFn: () => api('/matches') })
-  const predictions = useQueries({
-    queries: (matches.data ?? []).map(match => ({
-      queryKey: ['match-prediction', match.id],
-      queryFn: () => api<MatchPrediction>(`/matches/${match.id}/prediction`),
-      enabled: !!matches.data,
-    })),
+  const matchIds = useMemo(() => matches.data?.map(match => match.id) ?? [], [matches.data])
+  const predictions = useQuery<Record<string, MatchPrediction>>({
+    queryKey: ['match-predictions', matchIds],
+    queryFn: () => api<Record<string, MatchPrediction>>(`/matches/predictions?${matchIds.map(id => `match_ids=${id}`).join('&')}`),
+    enabled: matchIds.length > 0,
   })
   const predictionByMatchId = useMemo(
-    () => new Map((matches.data ?? []).map((match, index) => [match.id, predictions[index]?.data])),
-    [matches.data, predictions],
+    () => new Map(Object.entries(predictions.data ?? {}).map(([matchId, prediction]) => [Number(matchId), prediction])),
+    [predictions.data],
   )
 
   return <>
@@ -287,7 +286,7 @@ function SimulatorPage() {
       {active ? <SimulationProgress run={active} onCancel={() => cancelMutation.mutate(active.id)} cancelling={cancelMutation.isPending} variant="compact" /> : <div className="run-state idle"><span>Status</span><strong>{displayRun ? 'Ready for next run' : 'No runs yet'}</strong>{displayRun && <small>Last run: {displayRun.iterations.toLocaleString()} trials · seed {displayRun.seed}</small>}</div>}
     </section>
     {active && <SimulationProgress run={active} onCancel={() => cancelMutation.mutate(active.id)} cancelling={cancelMutation.isPending} />}
-    <section className="card"><div className="card-head"><div><span className="eyebrow">Stage reach</span><h2>Who goes deepest</h2></div>{latestCompleted && !active && <span className="meta">Seed {latestCompleted.seed} · {latestCompleted.model_version}{latestCompleted.duration_ms ? ` · ${formatDuration(latestCompleted.duration_ms)}` : ''}</span>}</div>{teams.data && !active ? <><div className="chart"><ResponsiveContainer width="100%" height={280}><BarChart data={teams.data.sort((a,b) => b.champion-a.champion).slice(0,12)} layout="vertical"><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" tickFormatter={value => percent(value)} /><YAxis dataKey="fifa_code" type="category" width={42} /><Tooltip formatter={(value) => percent(Number(value))} /><Bar dataKey="champion" fill="#c7ff55" radius={[0,6,6,0]} /></BarChart></ResponsiveContainer></div><StageTable teams={teams.data} /></> : <Empty text={active ? 'Results will appear when the run finishes.' : 'Run the simulator to calculate stage probabilities.'} />}</section>
+    <section className="card"><div className="card-head"><div><span className="eyebrow">Stage reach</span><h2>Who goes deepest</h2></div>{latestCompleted && !active && <span className="meta">Seed {latestCompleted.seed} · {latestCompleted.model_version}{latestCompleted.duration_ms ? ` · ${formatDuration(latestCompleted.duration_ms)}` : ''}</span>}</div>{teams.data && !active ? <><div className="chart"><ResponsiveContainer width="100%" height={280}><BarChart data={[...teams.data].sort((a,b) => b.champion-a.champion).slice(0,12)} layout="vertical"><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" tickFormatter={value => percent(value)} /><YAxis dataKey="fifa_code" type="category" width={42} /><Tooltip formatter={(value) => percent(Number(value))} /><Bar dataKey="champion" fill="#c7ff55" radius={[0,6,6,0]} /></BarChart></ResponsiveContainer></div><StageTable teams={teams.data} /></> : <Empty text={active ? 'Results will appear when the run finishes.' : 'Run the simulator to calculate stage probabilities.'} />}</section>
   </>
 }
 
@@ -426,6 +425,6 @@ function formatDuration(ms: number) {
 }
 
 function ScoreMatrix({ matrix }: { matrix?: number[][] }) { const cells = useMemo(()=>{ if(!matrix) return []; const output=[]; for(let a=0;a<5;a++) for(let b=0;b<5;b++) output.push({a,b,p:matrix[a][b]}); return output },[matrix]); return <div className="score-matrix">{cells.map(cell=><div key={`${cell.a}-${cell.b}`} style={{background:`rgba(199,255,85,${Math.min(.85,cell.p*5)})`}}><small>{cell.a}–{cell.b}</small><strong>{percent(cell.p)}</strong></div>)}</div> }
-function StageTable({ teams }: { teams: TeamForecast[] }) { return <div className="table-scroll"><table><thead><tr><th>Team</th><th>R32</th><th>R16</th><th>QF</th><th>SF</th><th>Final</th><th>Champion</th></tr></thead><tbody>{teams.sort((a,b)=>b.champion-a.champion).map(team=><tr key={team.team_id}><td className="team-name"><b>{team.fifa_code}</b> {team.name}</td>{['round_of_32','round_of_16','quarterfinal','semifinal','final','champion'].map(key=><td key={key}>{percent(team[key as keyof TeamForecast] as number)}</td>)}</tr>)}</tbody></table></div> }
+function StageTable({ teams }: { teams: TeamForecast[] }) { return <div className="table-scroll"><table><thead><tr><th>Team</th><th>R32</th><th>R16</th><th>QF</th><th>SF</th><th>Final</th><th>Champion</th></tr></thead><tbody>{[...teams].sort((a,b)=>b.champion-a.champion).map(team=><tr key={team.team_id}><td className="team-name"><b>{team.fifa_code}</b> {team.name}</td>{['round_of_32','round_of_16','quarterfinal','semifinal','final','champion'].map(key=><td key={key}>{percent(team[key as keyof TeamForecast] as number)}</td>)}</tr>)}</tbody></table></div> }
 
 export default App
