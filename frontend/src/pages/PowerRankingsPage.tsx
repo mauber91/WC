@@ -34,7 +34,7 @@ const SCORE_GUIDE = [
   },
   {
     term: 'Index',
-    detail: 'Overall rank score from the published simulation — knockout rounds weighted (champion counts most, then final, semi, quarter, etc.).',
+    detail: '70% simulation knockout reach + 30% WC-winner market prices (normalized), on a 0–100 scale.',
   },
   {
     term: 'SF',

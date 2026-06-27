@@ -20,6 +20,8 @@ class ContextParams:
     champion_strength_weight: float = 0.08
     champion_field_size: int = 48
     market_blend_alpha: float = 0.85
+    host_advantage_elo: float = 0.08
+    power_rank_market_blend: float = 0.30
     clinch_points: int = 6
     elim_points: int = 0
 

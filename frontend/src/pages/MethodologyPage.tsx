@@ -47,7 +47,7 @@ S* = (1 − w_c)·S + w_c·E_mkt(p_champion)         (default w_c = 0.15 when ma
       <Section eyebrow="Match model" title="Expected goals">
         <p>Given fused strengths S<sub>A</sub>, S<sub>B</sub>, define the log-strength gap Δ:</p>
         <Formula>{`Δ = 1.15·(S_A − S_B) / 400
-    + 0.13·𝟙[host A] − 0.13·𝟙[host B]
+    + 0.08·𝟙[host A] − 0.08·𝟙[host B]
     + β_rest · (rest_curve(days_A) − rest_curve(days_B))
     + β_travel · (travel_curve(km_B) − travel_curve(km_A))
 

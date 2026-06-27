@@ -88,6 +88,7 @@ def forecast_matches(db: Session, match_ids: list[int]) -> dict[int, tuple[Match
             travel_ref=params.travel_ref_km,
             goal_dispersion=params.goal_dispersion,
             market_blend_alpha=blend_alpha,
+            host_advantage=params.host_advantage_elo,
         ), sources, has_external_market)
     return output
 

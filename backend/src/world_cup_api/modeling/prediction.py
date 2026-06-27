@@ -59,11 +59,12 @@ def expected_goals(
     rest_cap: float = 4.0,
     beta_travel: float = 0.05,
     travel_ref: float = 3500.0,
+    host_advantage: float = 0.08,
 ) -> tuple[float, float]:
     from world_cup_api.modeling.context_params import rest_curve, travel_curve
 
     difference = 1.15 * (elo_a - elo_b) / 400
-    host_delta = 0.13 * int(host_a) - 0.13 * int(host_b)
+    host_delta = host_advantage * int(host_a) - host_advantage * int(host_b)
     rest_delta = beta_rest * (rest_curve(rest_a, cap=rest_cap) - rest_curve(rest_b, cap=rest_cap))
     travel_delta = beta_travel * (travel_curve(travel_b, ref=travel_ref) - travel_curve(travel_a, ref=travel_ref))
     baseline_log = log(1.32)
@@ -169,11 +170,17 @@ def build_forecast(
     travel_ref: float = 3500.0,
     goal_dispersion: float = 0.0,
     market_blend_alpha: float = 0.85,
+    host_advantage: float | None = None,
 ) -> MatchForecast:
+    from world_cup_api.modeling.context_params import DEFAULT_CONTEXT_PARAMS
+
+    if host_advantage is None:
+        host_advantage = DEFAULT_CONTEXT_PARAMS.host_advantage_elo
     lambda_a, lambda_b = expected_goals(
         elo_a, elo_b, host_a=host_a, host_b=host_b,
         rest_a=rest_a, rest_b=rest_b, travel_a=travel_a, travel_b=travel_b,
         beta_rest=beta_rest, rest_cap=rest_cap, beta_travel=beta_travel, travel_ref=travel_ref,
+        host_advantage=host_advantage,
     )
     raw_matrix = score_matrix(lambda_a, lambda_b, goal_dispersion=goal_dispersion)
     model = one_x_two(raw_matrix)

@@ -58,6 +58,7 @@ def _context_params_dict() -> dict[str, float | int]:
         "champion_strength_weight": params.champion_strength_weight,
         "champion_field_size": params.champion_field_size,
         "market_blend_alpha": params.market_blend_alpha,
+        "host_advantage_elo": params.host_advantage_elo,
         "clinch_points": params.clinch_points,
         "elim_points": params.elim_points,
     }
@@ -124,6 +125,7 @@ def _build_forecast_matrix(
         travel_ref=params.travel_ref_km,
         goal_dispersion=params.goal_dispersion,
         market_blend_alpha=blend_alpha,
+        host_advantage=params.host_advantage_elo,
     )
     return forecast.lambda_a, forecast.lambda_b, forecast.score_matrix
 
@@ -559,5 +561,6 @@ def _play_knockout(
             travel_ref=float(params["travel_ref_km"]),
             goal_dispersion=float(params.get("goal_dispersion", DEFAULT_CONTEXT_PARAMS.goal_dispersion)),
             market_blend_alpha=0.0,
+            host_advantage=float(params.get("host_advantage_elo", DEFAULT_CONTEXT_PARAMS.host_advantage_elo)),
         )
     return knockout_winner(team_a, team_b, cache[key], rng)

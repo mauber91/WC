@@ -23,6 +23,21 @@ def tournament_power_score(probs: dict[str, float]) -> float:
     )
 
 
+def blend_power_score(
+    sim_probs: dict[str, float],
+    market_prob: float | None,
+    *,
+    market_blend: float,
+    max_market_prob: float,
+) -> float:
+    """Blend simulation knockout reach with normalized WC-winner market prices."""
+    sim_score = tournament_power_score(sim_probs)
+    if market_blend <= 0 or market_prob is None or max_market_prob <= 0:
+        return sim_score
+    market_score = (market_prob / max_market_prob) * 100.0
+    return (1.0 - market_blend) * sim_score + market_blend * market_score
+
+
 def _team_probabilities(row: SimulationTeamResult, iterations: int) -> dict[str, float]:
     n = max(iterations, 1)
     return {
@@ -62,11 +77,16 @@ def power_rankings(db: Session, simulation: Simulation) -> list[dict]:
         .where(SimulationTeamResult.simulation_id == simulation.id),
     ).all()
 
+    market_probs = [champion_probs.get(team.id) for _, team in rows if champion_probs.get(team.id)]
+    max_market_prob = max(market_probs) if market_probs else 0.0
+
     ranked: list[dict] = []
     for sim_row, team in rows:
         membership = memberships.get(team.id)
         group_code = groups.get(membership.group_id) if membership else None
         probs = _team_probabilities(sim_row, iterations)
+        sim_index = tournament_power_score(probs)
+        market_prob = champion_probs.get(team.id)
         fused = fuse_strength(
             elo_table[team.id],
             fifa_ranks.get(team.id, 50.0),
@@ -85,7 +105,19 @@ def power_rankings(db: Session, simulation: Simulation) -> list[dict]:
             "fifa_rank": int(fifa_ranks.get(team.id, 50)),
             "tournament_elo": round(elo_table[team.id]),
             "fused_strength": round(fused),
-            "power_score": round(tournament_power_score(probs), 2),
+            "sim_power_score": round(sim_index, 2),
+            "market_power_score": round(
+                (market_prob / max_market_prob) * 100.0, 2,
+            ) if market_prob is not None and max_market_prob > 0 else None,
+            "power_score": round(
+                blend_power_score(
+                    probs,
+                    market_prob,
+                    market_blend=params.power_rank_market_blend,
+                    max_market_prob=max_market_prob,
+                ),
+                2,
+            ),
             **probs,
         })
 

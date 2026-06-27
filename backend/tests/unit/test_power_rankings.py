@@ -1,4 +1,4 @@
-from world_cup_api.services.power_rankings import tournament_power_score
+from world_cup_api.services.power_rankings import blend_power_score, tournament_power_score
 
 
 def test_tournament_power_score_weights_champion_most() -> None:
@@ -26,3 +26,19 @@ def test_tournament_power_score_is_monotonic_with_champion_prob() -> None:
     low = tournament_power_score({**base, "champion": 0.05})
     high = tournament_power_score({**base, "champion": 0.15})
     assert high > low
+
+
+def test_blend_power_score_favors_market_leader() -> None:
+    probs = {
+        "champion": 0.12,
+        "final": 0.18,
+        "semifinal": 0.25,
+        "quarterfinal": 0.35,
+        "round_of_16": 0.45,
+        "round_of_32": 0.55,
+    }
+    sim_only = blend_power_score(probs, 0.20, market_blend=0.0, max_market_prob=0.20)
+    blended = blend_power_score(probs, 0.20, market_blend=0.30, max_market_prob=0.20)
+    underdog = blend_power_score(probs, 0.10, market_blend=0.30, max_market_prob=0.20)
+    assert sim_only == tournament_power_score(probs)
+    assert blended > underdog
