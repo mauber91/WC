@@ -67,6 +67,20 @@ def _prune_simulations(conn: sqlite3.Connection, keep_id: str) -> None:
     conn.commit()
 
 
+def _export_style_profiles(target_db: Path, output_path: Path) -> int:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from world_cup_api.modeling.pmsr_style import build_all_team_style_profiles, save_published_style_profiles
+
+    engine = create_engine(f"sqlite:///{target_db}")
+    Session = sessionmaker(bind=engine)
+    with Session() as session:
+        profiles = build_all_team_style_profiles(session)
+    save_published_style_profiles(profiles, output_path)
+    return len(profiles)
+
+
 def _drop_match_report_tables(conn: sqlite3.Connection) -> None:
     tables = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'match_report_%'",
@@ -180,7 +194,6 @@ def main() -> None:
 
     with sqlite3.connect(target_db) as conn:
         _prune_simulations(conn, simulation_id)
-        _drop_match_report_tables(conn)
         row = conn.execute(
             """
             SELECT iterations, seed, input_cutoff_at, model_version, ruleset_version, completed_at, duration_ms
@@ -191,7 +204,15 @@ def main() -> None:
         ).fetchone()
         assert row is not None
 
-    print("Compacting publish database (dropping FIFA PMSR tables)...", file=sys.stderr)
+    profiles_path = args.output_dir / "team_style_profiles.json"
+    print("Exporting published team style profiles...", file=sys.stderr)
+    profile_count = _export_style_profiles(target_db, profiles_path)
+    print(f"Wrote {profile_count} team style profiles to {profiles_path}", file=sys.stderr)
+
+    with sqlite3.connect(target_db) as conn:
+        _drop_match_report_tables(conn)
+
+    print("Compacting publish database (dropping PMSR tables after profile export)...", file=sys.stderr)
     _compact_db(target_db)
     _stamp_alembic_head(target_db)
 

@@ -103,8 +103,13 @@ fi
 
 MANIFEST="$ROOT/publish/manifest.json"
 DB_FILE="$ROOT/publish/worldcup.db"
+PROFILES_FILE="$ROOT/publish/team_style_profiles.json"
 if [[ ! -f "$MANIFEST" || ! -f "$DB_FILE" ]]; then
   echo "Missing publish bundle. Run make publish first." >&2
+  exit 1
+fi
+if [[ ! -f "$PROFILES_FILE" ]]; then
+  echo "Missing publish/team_style_profiles.json. Re-run make publish." >&2
   exit 1
 fi
 
@@ -138,6 +143,9 @@ if [[ "$SKIP_DB_UPLOAD" -eq 0 ]]; then
   # flyctl sftp refuses to overwrite; upload to a temp name then swap atomically.
   fly ssh sftp put "$DB_FILE" /data/app/worldcup.db.new --app "$APP"
   fly ssh console --app "$APP" -C "sh -c 'rm -f /data/app/worldcup.db /data/app/worldcup.db-wal /data/app/worldcup.db-shm && mv /data/app/worldcup.db.new /data/app/worldcup.db'"
+  echo "==> Uploading team style profiles to /data/app/team_style_profiles.json"
+  fly ssh sftp put "$PROFILES_FILE" /data/app/team_style_profiles.json.new --app "$APP"
+  fly ssh console --app "$APP" -C "sh -c 'mv /data/app/team_style_profiles.json.new /data/app/team_style_profiles.json'"
   echo "==> Restarting app to pick up database"
   fly apps restart "$APP"
 fi

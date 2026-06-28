@@ -18,11 +18,11 @@ from world_cup_api.modeling.context_params import DEFAULT_CONTEXT_PARAMS
 from world_cup_api.modeling.pmsr_style import (
     StyleMatchup,
     TacticalStats,
-    build_team_style_profile,
     compute_percentile_bounds,
     ensure_style_model,
     index_style_features_by_match,
     load_team_match_style_features,
+    resolve_team_style_profile,
 )
 from world_cup_api.modeling.pmsr_style import apply_style_to_forecast as apply_style_forecast
 from world_cup_api.modeling.prediction import MatchForecast, build_forecast, devig, knockout_win_probability, log_pool
@@ -115,8 +115,8 @@ def forecast_knockout_matchup(
         market_blend_alpha=0.0,
         host_advantage=params.host_advantage_elo,
     )
-    profile_a = build_team_style_profile(style_features, style_by_match, team_a_id, style_cutoff, bounds)
-    profile_b = build_team_style_profile(style_features, style_by_match, team_b_id, style_cutoff, bounds)
+    profile_a = resolve_team_style_profile(style_features, style_by_match, team_a_id, style_cutoff, bounds)
+    profile_b = resolve_team_style_profile(style_features, style_by_match, team_b_id, style_cutoff, bounds)
     profile_payload_a = {"attack": profile_a.attack, "defend": profile_a.defend} if profile_a else None
     profile_payload_b = {"attack": profile_b.attack, "defend": profile_b.defend} if profile_b else None
     tactical: TacticalStats | None = None
@@ -220,10 +220,10 @@ def forecast_matches(db: Session, match_ids: list[int]) -> dict[int, MatchForeca
             host_advantage=params.host_advantage_elo,
         )
         profile_before = style_cutoff if match.group_id is None else match.official_match_number
-        profile_a = build_team_style_profile(
+        profile_a = resolve_team_style_profile(
             style_features, style_by_match, match.team_a_id, profile_before, bounds
         )
-        profile_b = build_team_style_profile(
+        profile_b = resolve_team_style_profile(
             style_features, style_by_match, match.team_b_id, profile_before, bounds
         )
         profile_payload_a = {"attack": profile_a.attack, "defend": profile_a.defend} if profile_a else None

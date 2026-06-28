@@ -141,6 +141,82 @@ class TeamStyleProfile:
     def defend_axis(self, name: str) -> float:
         return self.defend.get(name, 0.5)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "team_id": self.team_id,
+            "matches_played": self.matches_played,
+            "attack": self.attack,
+            "defend": self.defend,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> TeamStyleProfile:
+        return cls(
+            team_id=int(data["team_id"]),
+            matches_played=int(data["matches_played"]),
+            attack=dict(data["attack"]),
+            defend=dict(data["defend"]),
+        )
+
+
+def published_style_profiles_path() -> Path:
+    """Sidecar cache written at publish time; lives next to the SQLite DB on Fly."""
+    from world_cup_api.config import ROOT_DIR, get_settings
+
+    settings = get_settings()
+    if settings.database_url.startswith("sqlite:///"):
+        db_path = Path(settings.database_url.removeprefix("sqlite:///"))
+        return db_path.parent / "team_style_profiles.json"
+    return ROOT_DIR / "data" / "app" / "team_style_profiles.json"
+
+
+def build_all_team_style_profiles(session: Session) -> dict[int, TeamStyleProfile]:
+    """Build lagged group-stage profiles for every team with PMSR coverage."""
+    style_model = ensure_style_model(session)
+    style_features = load_team_match_style_features(session)
+    if not style_features:
+        return {}
+    style_by_match = index_style_features_by_match(style_features)
+    bounds = style_model.percentile_bounds or compute_percentile_bounds(style_features)
+    cutoff = session.scalar(select(func.max(Match.official_match_number)).where(Match.group_id.is_not(None)))
+    before_match_number = int(cutoff or 72) + 1
+    profiles: dict[int, TeamStyleProfile] = {}
+    for team_id in {feature.team_id for feature in style_features}:
+        profile = build_team_style_profile(
+            style_features, style_by_match, team_id, before_match_number, bounds
+        )
+        if profile is not None:
+            profiles[team_id] = profile
+    return profiles
+
+
+def save_published_style_profiles(profiles: dict[int, TeamStyleProfile], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {str(team_id): profile.to_dict() for team_id, profile in profiles.items()}
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+@lru_cache
+def load_published_style_profiles() -> dict[int, TeamStyleProfile]:
+    path = published_style_profiles_path()
+    if not path.exists():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return {int(team_id): TeamStyleProfile.from_dict(data) for team_id, data in raw.items()}
+
+
+def resolve_team_style_profile(
+    style_features: list[TeamMatchStyleFeatures],
+    style_by_match: dict[int, dict[int, TeamMatchStyleFeatures]],
+    team_id: int,
+    before_match_number: int,
+    bounds: dict[str, tuple[float, float]],
+) -> TeamStyleProfile | None:
+    cached = load_published_style_profiles()
+    if team_id in cached:
+        return cached[team_id]
+    return build_team_style_profile(style_features, style_by_match, team_id, before_match_number, bounds)
+
 
 @dataclass(frozen=True)
 class StyleInteractionScore:

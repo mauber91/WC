@@ -22,6 +22,7 @@ COPY backend/alembic.ini ./
 RUN uv sync --frozen --no-dev
 
 COPY data/seed /app/data/seed
+COPY data/modeling /app/data/modeling
 COPY scripts/docker-entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh \
