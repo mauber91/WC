@@ -22,6 +22,8 @@ class ContextParams:
     market_blend_alpha: float = 0.85
     host_advantage_elo: float = 0.08
     pmsr_alpha_xg: float = 0.08
+    style_ridge_alpha: float = 1.0
+    style_interactions_enabled: bool = True
     power_rank_market_blend: float = 0.30
     clinch_points: int = 6
     elim_points: int = 0

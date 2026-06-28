@@ -1,4 +1,4 @@
-.PHONY: setup dev-api dev-web dev-remote release remote-setup ssh-tunnel spark-ping spark-sync spark-setup spark-dev spark-tunnel test lint build migrate benchmark report-inspect report-extract report-ingest report-batch-ingest pmsr-backtest pmsr-features publish deploy deploy-sim deploy-ui deploy-fly deploy-pages
+.PHONY: setup dev-api dev-web dev-remote release remote-setup ssh-tunnel spark-ping spark-sync spark-setup spark-dev spark-tunnel test lint build migrate benchmark report-inspect report-extract report-ingest report-batch-ingest pmsr-backtest pmsr-features pmsr-style-backtest publish deploy deploy-sim deploy-ui deploy-fly deploy-pages
 
 setup:
 	cd backend && uv sync
@@ -121,3 +121,6 @@ pmsr-backtest:
 
 pmsr-features:
 	cd backend && uv run python ../scripts/pmsr_backtest.py --features-only
+
+pmsr-style-backtest:
+	cd backend && uv run python ../scripts/pmsr_style_backtest.py $(ARGS)

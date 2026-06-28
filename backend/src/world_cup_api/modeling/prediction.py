@@ -195,6 +195,43 @@ def sample_score(forecast: MatchForecast, rng: np.random.Generator) -> tuple[int
     return divmod(flat_index, matrix.shape[1])
 
 
+def knockout_win_probability(forecast: MatchForecast) -> float:
+    """Probability team A advances (win in 90, ET, or penalties) from the score matrix."""
+    matrix = np.asarray(forecast.score_matrix, dtype=float)
+    p_win_90 = float(np.tril(matrix, -1).sum())
+    p_draw_90 = float(np.trace(matrix))
+    la, lb = forecast.lambda_a, forecast.lambda_b
+    et_scale = 0.3
+    p_a_wins_et = 0.0
+    p_b_wins_et = 0.0
+    p_et_draw = 0.0
+    # Full extra-time goal distribution (including 0-0 and level scores) so the
+    # three outcomes sum to 1; the drawn-ET tail resolves via penalties.
+    for extra_total in range(0, 8):
+        for ea in range(extra_total + 1):
+            eb = extra_total - ea
+            poisson_weight = (
+                np.exp(-(la + lb) * et_scale)
+                * (la * et_scale) ** ea
+                * (lb * et_scale) ** eb
+                / (float(factorial(ea)) * float(factorial(eb)))
+            )
+            if ea > eb:
+                p_a_wins_et += float(poisson_weight)
+            elif ea < eb:
+                p_b_wins_et += float(poisson_weight)
+            else:
+                p_et_draw += float(poisson_weight)
+    et_total = p_a_wins_et + p_b_wins_et + p_et_draw
+    if et_total > 0:
+        p_a_wins_et /= et_total
+        p_b_wins_et /= et_total
+        p_et_draw /= et_total
+    # P(advance | draw 90) = win ET + (draw ET)*0.5 from penalties.
+    p_advance_given_draw = p_a_wins_et + p_et_draw * 0.5
+    return p_win_90 + p_draw_90 * p_advance_given_draw
+
+
 def knockout_winner(
     team_a_id: int,
     team_b_id: int,
@@ -208,4 +245,12 @@ def knockout_winner(
     extra_b = int(rng.poisson(forecast.lambda_b * 0.3))
     if extra_a != extra_b:
         return team_a_id if extra_a > extra_b else team_b_id
-    return team_a_id if rng.random() < 0.5 else team_b_id
+    shootout_bias = knockout_win_probability(forecast)
+    matrix = np.asarray(forecast.score_matrix, dtype=float)
+    p_win_90 = float(np.tril(matrix, -1).sum())
+    p_draw_90 = float(np.trace(matrix))
+    if p_draw_90 > 0:
+        shootout_bias = max(0.05, min(0.95, (shootout_bias - p_win_90) / p_draw_90))
+    else:
+        shootout_bias = forecast.lambda_a / max(forecast.lambda_a + forecast.lambda_b, 1e-6)
+    return team_a_id if rng.random() < shootout_bias else team_b_id

@@ -35,6 +35,16 @@ from world_cup_api.domain.team_strength import fuse_strength
 from world_cup_api.domain.tournament_elo import build_elo_table
 from world_cup_api.domain.venues import team_base_camps
 from world_cup_api.modeling.context_params import DEFAULT_CONTEXT_PARAMS, elo_sigma
+from world_cup_api.modeling.pmsr_style import (
+    TeamStyleProfile,
+    apply_style_to_forecast,
+    build_team_style_profile,
+    compute_percentile_bounds,
+    ensure_style_model,
+    index_style_features_by_match,
+    load_style_model,
+    load_team_match_style_features,
+)
 from world_cup_api.modeling.prediction import MatchForecast, build_forecast, knockout_winner
 from world_cup_api.services.champion_market_sync import champion_probs_by_team_id
 from world_cup_api.services.tournament_elo import baseline_elos, current_tournament_elos, team_elo
@@ -243,6 +253,30 @@ def build_input_snapshot(db: Session) -> tuple[dict, str]:
     knockout_rest = {str(k): list(v) for k, v in knockout_rest_context(raw_group_matches).items()}
     knockout_coords = {str(k): list(v) for k, v in knockout_venue_coords().items()}
 
+    style_features = load_team_match_style_features(db)
+    style_by_match = index_style_features_by_match(style_features)
+    style_model = ensure_style_model(db)
+    bounds = style_model.percentile_bounds or compute_percentile_bounds(style_features)
+    max_group_number = max(
+        (item["official_match_number"] for group in groups.values() for item in group["matches"]),
+        default=72,
+    )
+    style_profiles: dict[str, dict] = {}
+    for team_id in teams:
+        profile = build_team_style_profile(
+            style_features,
+            style_by_match,
+            int(team_id),
+            max_group_number + 1,
+            bounds,
+        )
+        if profile is not None:
+            style_profiles[team_id] = {
+                "matches_played": profile.matches_played,
+                "attack": profile.attack,
+                "defend": profile.defend,
+            }
+
     for group in groups.values():
         for item in group["matches"]:
             item["scheduled_at"] = _snapshot_datetime(item["scheduled_at"])
@@ -259,6 +293,7 @@ def build_input_snapshot(db: Session) -> tuple[dict, str]:
         "knockout_venue_coords": knockout_coords,
         "context_params": _context_params_dict(),
         "third_place_assignments": assignments,
+        "style_profiles": style_profiles,
     })
     hash_payload = {key: value for key, value in snapshot.items() if key != "cutoff"}
     encoded = json.dumps(hash_payload, sort_keys=True, separators=(",", ":")).encode()
@@ -503,6 +538,18 @@ def _resolve_source(source: tuple[str, str], rankings: dict[str, list[StandingRo
     return thirds[assignment[reference]]
 
 
+def _style_profile_from_snapshot(snapshot: dict, team_id: int) -> TeamStyleProfile | None:
+    raw = snapshot.get("style_profiles", {}).get(str(team_id))
+    if raw is None:
+        return None
+    return TeamStyleProfile(
+        team_id=team_id,
+        matches_played=int(raw["matches_played"]),
+        attack=dict(raw["attack"]),
+        defend=dict(raw["defend"]),
+    )
+
+
 def _play_knockout(
     team_a: int,
     team_b: int,
@@ -563,4 +610,15 @@ def _play_knockout(
             market_blend_alpha=0.0,
             host_advantage=float(params.get("host_advantage_elo", DEFAULT_CONTEXT_PARAMS.host_advantage_elo)),
         )
+        profile_a = _style_profile_from_snapshot(snapshot, team_a)
+        profile_b = _style_profile_from_snapshot(snapshot, team_b)
+        if profile_a is not None and profile_b is not None:
+            forecast, _, _ = apply_style_to_forecast(
+                cache[key],
+                profile_a,
+                profile_b,
+                goal_dispersion=float(params.get("goal_dispersion", DEFAULT_CONTEXT_PARAMS.goal_dispersion)),
+                model=load_style_model(),
+            )
+            cache[key] = forecast
     return knockout_winner(team_a, team_b, cache[key], rng)

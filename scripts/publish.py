@@ -67,6 +67,24 @@ def _prune_simulations(conn: sqlite3.Connection, keep_id: str) -> None:
     conn.commit()
 
 
+def _drop_match_report_tables(conn: sqlite3.Connection) -> None:
+    tables = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'match_report_%'",
+    ).fetchall()
+    if not tables:
+        return
+    conn.execute("PRAGMA foreign_keys = OFF")
+    for (name,) in tables:
+        conn.execute(f'DROP TABLE IF EXISTS "{name}"')
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON")
+
+
+def _compact_db(db_path: Path) -> None:
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("VACUUM")
+
+
 def _load_scenario(path: Path | None) -> dict | None:
     if path is None:
         return None
@@ -162,6 +180,7 @@ def main() -> None:
 
     with sqlite3.connect(target_db) as conn:
         _prune_simulations(conn, simulation_id)
+        _drop_match_report_tables(conn)
         row = conn.execute(
             """
             SELECT iterations, seed, input_cutoff_at, model_version, ruleset_version, completed_at, duration_ms
@@ -172,6 +191,8 @@ def main() -> None:
         ).fetchone()
         assert row is not None
 
+    print("Compacting publish database (dropping FIFA PMSR tables)...", file=sys.stderr)
+    _compact_db(target_db)
     _stamp_alembic_head(target_db)
 
     scenario = _load_scenario(args.scenario_file)

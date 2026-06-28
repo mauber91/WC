@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
 import { percent } from '../api/client'
 import { bracketExportFilename, exportBracketPng } from '../lib/exportBracketPng'
 import { BracketJoinCell } from './BracketJoinCell'
@@ -42,6 +43,10 @@ function rowStyle(row: number, span: number): CSSProperties {
   return bracketRowStyle(row, span)
 }
 
+function knockoutPredictionPath(match: BracketMatch): string {
+  return `/knockout/${match.matchNumber}?team_a_id=${match.teamA.id}&team_b_id=${match.teamB.id}`
+}
+
 function BracketMatchCard({ match, matchNumber, isFinal = false }: {
   match: BracketMatch | undefined
   matchNumber: number
@@ -53,7 +58,7 @@ function BracketMatchCard({ match, matchNumber, isFinal = false }: {
   const schedule = formatKnockoutKickoff(match.scheduledAt, match.matchNumber)
   const label = match.matchupProbability >= 0.15 ? 'Most likely' : 'Projected'
   return (
-    <article className={`bracket-match-card${isFinal ? ' final' : ''}`}>
+    <Link to={knockoutPredictionPath(match)} className={`bracket-match-card bracket-match-link${isFinal ? ' final' : ''}`} onClick={event => event.stopPropagation()}>
       <div className="bracket-match-body">
         <header className="bracket-match-head">
           <span className="bracket-badge">{label}</span>
@@ -69,7 +74,7 @@ function BracketMatchCard({ match, matchNumber, isFinal = false }: {
           <span>{match.scheduledAt ? schedule.date : `M${match.matchNumber}`}</span>
         </footer>
       </div>
-    </article>
+    </Link>
   )
 }
 

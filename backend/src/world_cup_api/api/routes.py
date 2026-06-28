@@ -27,7 +27,7 @@ from world_cup_api.db.report_models import (
 )
 from world_cup_api.db.session import get_db
 from world_cup_api.jobs.scheduler import schedule_simulation
-from world_cup_api.services.predictions import forecast_match, forecast_matches
+from world_cup_api.services.predictions import MatchForecastResult, forecast_knockout_matchup, forecast_match, forecast_matches
 from world_cup_api.services.results import remove_current_result, revise_result
 from world_cup_api.services.champion_market_sync import sync_wc_champion_markets
 from world_cup_api.services.market_sync import sync_upcoming_markets
@@ -135,8 +135,8 @@ def match_predictions(
     if ids is None:
         ids = list(db.scalars(select(Match.id).where(Match.team_a_id.is_not(None), Match.team_b_id.is_not(None))))
     return {
-        match_id: _match_prediction_payload(match, forecast, sources, has_external_market)
-        for match_id, (match, forecast, sources, has_external_market) in forecast_matches(db, ids).items()
+        match_id: _match_prediction_payload(result)
+        for match_id, result in forecast_matches(db, ids).items()
     }
 
 
@@ -151,10 +151,31 @@ def match_detail(match_id: int, db: Session = Depends(get_db)) -> dict:
 @router.get("/matches/{match_id}/prediction")
 def match_prediction(match_id: int, db: Session = Depends(get_db)) -> dict:
     try:
-        match, forecast, sources, has_external_market = forecast_match(db, match_id)
+        result = forecast_match(db, match_id)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
-    return _match_prediction_payload(match, forecast, sources, has_external_market)
+    return _match_prediction_payload(result)
+
+
+@router.get("/knockout/{match_number}/prediction")
+def knockout_match_prediction(
+    match_number: int,
+    team_a_id: int = Query(...),
+    team_b_id: int = Query(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    if team_a_id == team_b_id:
+        raise HTTPException(400, "Teams must be different")
+    try:
+        result = forecast_knockout_matchup(
+            db,
+            official_match_number=match_number,
+            team_a_id=team_a_id,
+            team_b_id=team_b_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return _match_prediction_payload(result)
 
 
 @router.get("/matches/{match_id}/odds")
@@ -649,12 +670,64 @@ def _issue_payload(row: MatchReportIssue) -> dict:
     }
 
 
-def _match_prediction_payload(match, forecast, sources: list[dict], has_external_market: bool) -> dict:
-    return {"match_id": match.id, "generated_at": datetime.now(timezone.utc), "model_version": "nbinom-fused-strength-v1",
-            "lambda_a": forecast.lambda_a, "lambda_b": forecast.lambda_b,
-            "market": _triple(forecast.market), "model": _triple(forecast.model), "final": _triple(forecast.final),
-            "score_distribution": forecast.score_matrix, "market_sources": sources,
-            "data_quality": "market_blend" if has_external_market else "model_only"}
+def _match_prediction_payload(result: MatchForecastResult) -> dict:
+    match = result.match
+    forecast = result.forecast
+    sources = result.sources
+    has_external_market = result.has_external_market
+    is_knockout = match is None or match.group_id is None
+    payload = {
+        "match_id": match.id if match is not None else None,
+        "official_match_number": match.official_match_number if match is not None else result.official_match_number,
+        "team_a_id": match.team_a_id if match is not None else (result.team_a.id if result.team_a else None),
+        "team_b_id": match.team_b_id if match is not None else (result.team_b.id if result.team_b else None),
+        "is_knockout": is_knockout,
+        "generated_at": datetime.now(timezone.utc),
+        "model_version": "nbinom-fused-strength-v1",
+        "lambda_a": forecast.lambda_a,
+        "lambda_b": forecast.lambda_b,
+        "market": _triple(forecast.market),
+        "model": _triple(forecast.model),
+        "final": _triple(forecast.final),
+        "score_distribution": forecast.score_matrix,
+        "market_sources": sources,
+        "data_quality": "market_blend" if has_external_market else "model_only",
+    }
+    if result.tactical is not None:
+        tactical = result.tactical
+        payload["tactical_stats"] = {
+            "possession_a": tactical.possession_a,
+            "possession_b": tactical.possession_b,
+            "shots_a": tactical.shots_a,
+            "shots_b": tactical.shots_b,
+            "sot_a": tactical.sot_a,
+            "sot_b": tactical.sot_b,
+            "xg_a": tactical.xg_a,
+            "xg_b": tactical.xg_b,
+        }
+    if result.style_matchup is not None:
+        matchup = result.style_matchup
+        style_payload: dict[str, object] = {
+            "favor": matchup.favor,
+            "net_xg_delta_a": matchup.net_xg_delta_a,
+            "narrative": matchup.narrative,
+            "interaction_scores": [
+                {
+                    "key": item.key,
+                    "label": item.label,
+                    "value": item.value,
+                    "coefficient": item.coefficient,
+                    "contribution": item.contribution,
+                }
+                for item in matchup.interactions
+            ],
+        }
+        if result.style_profile_a is not None and result.style_profile_b is not None:
+            style_payload["profiles"] = {"a": result.style_profile_a, "b": result.style_profile_b}
+        payload["style_matchup"] = style_payload
+    if result.advance_probability_a is not None:
+        payload["advance_probability_a"] = result.advance_probability_a
+    return payload
 
 
 def _standing_dict(row) -> dict:

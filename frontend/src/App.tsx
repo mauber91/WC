@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, percent } from './api/client'
@@ -25,7 +25,40 @@ type Run = SimulationRun
 type TeamForecast = { team_id: number; name: string; fifa_code: string; win_group: number; finish_1: number; finish_2: number; finish_3: number; finish_4: number; top_two: number; advance_as_third: number; round_of_32: number; round_of_16: number; quarterfinal: number; semifinal: number; final: number; champion: number; eliminated: number; expected_group_points: number; expected_group_goals_for: number; expected_group_goals_against: number; r32_rivals?: { as_winner: Array<{ team_id: number; name: string; fifa_code: string; probability: number }>; as_runner_up: Array<{ team_id: number; name: string; fifa_code: string; probability: number }>; as_third: Array<{ team_id: number; name: string; fifa_code: string; probability: number }> } }
 type Projection = { teams: TeamForecast[] }
 type Triple = { team_a: number; draw: number; team_b: number }
-type MatchPrediction = { data_quality: string; lambda_a: number; lambda_b: number; final: Triple; model: Triple; market: Triple | null; score_distribution: number[][] }
+type TacticalStats = {
+  possession_a: number
+  possession_b: number
+  shots_a: number
+  shots_b: number
+  sot_a: number
+  sot_b: number
+  xg_a: number
+  xg_b: number
+}
+type StyleInteraction = { key: string; label: string; value: number; coefficient: number; contribution: number }
+type StyleMatchup = {
+  favor: 'team_a' | 'team_b' | 'even'
+  net_xg_delta_a: number
+  narrative: string
+  interaction_scores: StyleInteraction[]
+}
+type MatchPrediction = {
+  match_id?: number | null
+  official_match_number?: number
+  team_a_id?: number
+  team_b_id?: number
+  is_knockout?: boolean
+  data_quality: string
+  lambda_a: number
+  lambda_b: number
+  final: Triple
+  model: Triple
+  market: Triple | null
+  score_distribution: number[][]
+  tactical_stats?: TacticalStats
+  style_matchup?: StyleMatchup
+  advance_probability_a?: number
+}
 type ImportPreview = { id: string; record_count: number; status: string; errors: { row: number; message: string }[] }
 type MarketSyncReport = {
   fixtures: Array<{ match_id: number; match_number: number; stored_rows: number; platforms: string[]; warnings: string[] }>
@@ -45,31 +78,34 @@ type MatchReportData = {
   [key: string]: unknown
 }
 
-type NavItem = { to: string; label: string; activePrefix?: string; featured?: boolean }
+type NavItem = { to: string; label: string; activePrefix?: string; featured?: boolean; hint?: string; archive?: boolean }
 
-const forecastNav: NavItem[] = [
-  { to: '/bracket', label: 'Bracket', activePrefix: '/bracket' },
-  { to: '/rankings', label: 'Power Rankings', activePrefix: '/rankings', featured: true },
-  { to: '/groups/A', label: 'Groups', activePrefix: '/groups' },
-  { to: '/matches', label: 'Matches', activePrefix: '/matches' },
+const knockoutNav: NavItem[] = [
+  { to: '/bracket', label: 'Projected bracket', activePrefix: '/bracket', featured: true, hint: 'Advance odds · tactical fit' },
+  { to: '/rankings', label: 'Power rankings', activePrefix: '/rankings' },
   { to: '/teams', label: 'Teams', activePrefix: '/teams' },
-  { to: '/methodology', label: 'Methodology', activePrefix: '/methodology' },
-]
-
-const localNav: NavItem[] = [
-  { to: '/groups/A', label: 'Groups', activePrefix: '/groups' },
-  { to: '/matches', label: 'Matches', activePrefix: '/matches' },
-  { to: '/simulator', label: 'Simulator', activePrefix: '/simulator' },
-  { to: '/scenario', label: 'Your bracket', activePrefix: '/scenario' },
-  { to: '/bracket', label: 'Bracket', activePrefix: '/bracket' },
-  { to: '/rankings', label: 'Power Rankings', activePrefix: '/rankings', featured: true },
-  { to: '/teams', label: 'Teams', activePrefix: '/teams' },
-  { to: '/methodology', label: 'Methodology', activePrefix: '/methodology' },
-  { to: '/admin/data', label: 'Admin', activePrefix: '/admin' },
 ]
 
 const scenarioNav: NavItem[] = [
-  { to: '/scenario', label: 'Your bracket', activePrefix: '/scenario' },
+  { to: '/scenario', label: 'Your bracket', activePrefix: '/scenario', hint: 'Play out scores in your browser' },
+]
+
+const groupStageArchiveNav: NavItem[] = [
+  { to: '/groups/A', label: 'Final standings', activePrefix: '/groups', archive: true },
+  { to: '/matches', label: 'Group matches', activePrefix: '/matches', archive: true },
+]
+
+const referenceNav: NavItem[] = [
+  { to: '/methodology', label: 'Methodology', activePrefix: '/methodology', archive: true },
+]
+
+const localKnockoutNav: NavItem[] = [
+  ...knockoutNav,
+  { to: '/simulator', label: 'Simulator', activePrefix: '/simulator' },
+]
+
+const localAdminNav: NavItem[] = [
+  { to: '/admin/data', label: 'Admin', activePrefix: '/admin', archive: true },
 ]
 
 function SidebarNav({ items, sectionLabel, onNavigate }: { items: NavItem[]; sectionLabel?: string; onNavigate?: () => void }) {
@@ -78,7 +114,7 @@ function SidebarNav({ items, sectionLabel, onNavigate }: { items: NavItem[]; sec
     <div className="sidebar-nav-section">
       {sectionLabel && <span className="sidebar-section-label">{sectionLabel}</span>}
       <nav>
-        {items.map(({ to, label, activePrefix, featured }) => {
+        {items.map(({ to, label, activePrefix, featured, hint, archive }) => {
           const active = activePrefix ? location.pathname.startsWith(activePrefix) : undefined
           return (
             <NavLink
@@ -87,11 +123,14 @@ function SidebarNav({ items, sectionLabel, onNavigate }: { items: NavItem[]; sec
               onClick={onNavigate}
               className={({ isActive }) => {
                 const activeClass = activePrefix ? (active ? 'active' : '') : (isActive ? 'active' : '')
-                return [activeClass, featured ? 'nav-featured' : ''].filter(Boolean).join(' ')
+                return [activeClass, featured ? 'nav-featured' : '', archive ? 'nav-archive' : ''].filter(Boolean).join(' ')
               }}
             >
-              {featured && <span className="nav-featured-mark" aria-hidden>▴</span>}
-              {label}
+              <span className="nav-link-copy">
+                {featured && <span className="nav-featured-mark" aria-hidden>▴</span>}
+                <span className="nav-link-label">{label}</span>
+                {hint && <small className="nav-link-hint">{hint}</small>}
+              </span>
             </NavLink>
           )
         })}
@@ -106,19 +145,25 @@ function App() {
     <RouteSeo />
     <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
       <div className="sidebar-top">
-        <div className="brand"><span className="brand-mark">26</span><div><strong>{SITE_SHORT_NAME}</strong><small>{isPublishedMode ? 'Probabilistic simulation' : 'World Cup intelligence'}</small></div></div>
+        <div className="brand"><span className="brand-mark">26</span><div><strong>{SITE_SHORT_NAME}</strong><small>{isPublishedMode ? 'Knockout stage' : 'World Cup intelligence'}</small></div></div>
         <button type="button" className="sidebar-menu-toggle" aria-label="Toggle navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(open => !open)}><span /><span /><span /></button>
       </div>
       <div className="sidebar-body">
       {isPublishedMode ? <>
-        <SidebarNav items={forecastNav} sectionLabel="Probabilistic simulation model" onNavigate={() => setMenuOpen(false)} />
-        <SidebarNav items={scenarioNav} sectionLabel="Scenario" onNavigate={() => setMenuOpen(false)} />
+        <SidebarNav items={knockoutNav} sectionLabel="Knockout stage" onNavigate={() => setMenuOpen(false)} />
+        <SidebarNav items={scenarioNav} sectionLabel="What-if" onNavigate={() => setMenuOpen(false)} />
+        <SidebarNav items={groupStageArchiveNav} sectionLabel="Group stage archive" onNavigate={() => setMenuOpen(false)} />
+        <SidebarNav items={referenceNav} onNavigate={() => setMenuOpen(false)} />
         <SidebarPublishedStatus />
       </> : <>
-        <SidebarNav items={localNav} onNavigate={() => setMenuOpen(false)} />
+        <SidebarNav items={localKnockoutNav} sectionLabel="Knockout stage" onNavigate={() => setMenuOpen(false)} />
+        <SidebarNav items={scenarioNav} sectionLabel="What-if" onNavigate={() => setMenuOpen(false)} />
         <SidebarSimulationStatus />
+        <SidebarNav items={groupStageArchiveNav} sectionLabel="Group stage archive" onNavigate={() => setMenuOpen(false)} />
+        <SidebarNav items={referenceNav} onNavigate={() => setMenuOpen(false)} />
+        <SidebarNav items={localAdminNav} onNavigate={() => setMenuOpen(false)} />
       </>}
-      <div className="sidebar-note"><span className="live-dot" /> {isPublishedMode ? 'Forecast + what-if playground' : 'Local data workspace'}<small>{isPublishedMode ? 'Scenario scores stay in your browser.' : 'Probabilities, not promises.'}</small></div>
+      <div className="sidebar-note"><span className="live-dot" /> {isPublishedMode ? 'Knockout forecast live' : 'Local data workspace'}<small>{isPublishedMode ? 'Open any bracket match for advance odds and tactical fit.' : 'Probabilities, not promises.'}</small></div>
       </div>
     </aside>
     {menuOpen && <button type="button" className="sidebar-backdrop" aria-hidden tabIndex={-1} onClick={() => setMenuOpen(false)} />}
@@ -127,6 +172,7 @@ function App() {
       <Route path="/groups/:code" element={<GroupPage />} />
       <Route path="/matches" element={<MatchesPage />} />
       <Route path="/matches/:id" element={<MatchPage />} />
+      <Route path="/knockout/:matchNumber" element={<KnockoutMatchPage />} />
       {!isPublishedMode && <Route path="/simulator" element={<SimulatorPage />} />}
       <Route path="/scenario" element={<ManualScenarioPage />} />
       <Route path="/methodology" element={<MethodologyPage />} />
@@ -249,17 +295,64 @@ function MatchesPage() {
   </>
 }
 
+function KnockoutMatchPage() {
+  const { matchNumber } = useParams()
+  const [searchParams] = useSearchParams()
+  const teamAId = Number(searchParams.get('team_a_id'))
+  const teamBId = Number(searchParams.get('team_b_id'))
+  const teams = useQuery<Team[]>({ queryKey: ['teams'], queryFn: () => api('/teams') })
+  const prediction = useQuery<MatchPrediction>({
+    queryKey: ['knockout-prediction', matchNumber, teamAId, teamBId],
+    queryFn: () => api(`/knockout/${matchNumber}/prediction?team_a_id=${teamAId}&team_b_id=${teamBId}`),
+    enabled: Number.isFinite(teamAId) && Number.isFinite(teamBId) && teamAId > 0 && teamBId > 0,
+  })
+  const teamA = teams.data?.find(team => team.id === teamAId)
+  const teamB = teams.data?.find(team => team.id === teamBId)
+  const labels = [teamA?.name ?? 'Team A', 'Draw', teamB?.name ?? 'Team B']
+  const tactical = prediction.data?.tactical_stats
+  const matchup = prediction.data?.style_matchup
+  if (!Number.isFinite(teamAId) || !Number.isFinite(teamBId)) {
+    return <Empty text="Open this matchup from the bracket projection." />
+  }
+  return <><PageHeader eyebrow={`Knockout M${matchNumber ?? ''}`} title={`${labels[0]} vs ${labels[2]}`} detail="Style profiles use group-stage PMSR only. Advance probability includes extra time and penalties." actions={<NavLink className="button ghost" to="/bracket">Back to bracket</NavLink>} />
+    <div className="two-col"><section className="card"><div className="card-head"><div><span className="eyebrow">Knockout model</span><h2>Outcome probabilities</h2></div><span className="quality">{prediction.data?.data_quality?.replace('_', ' ')}</span></div>
+      <div className="outcome-grid">{prediction.data && Object.values(prediction.data.final).map((value, index) => <div key={labels[index]}><span>{labels[index]}</span><strong>{percent(value)}</strong><i style={{ width: percent(value) }} /></div>)}</div>
+      {prediction.data?.advance_probability_a != null && <div className="advance-prob"><h3>Advance probability</h3><div><span>{labels[0]}</span><strong>{percent(prediction.data.advance_probability_a)}</strong></div><div><span>{labels[2]}</span><strong>{percent(1 - prediction.data.advance_probability_a)}</strong></div></div>}
+    </section><section className="card"><div className="card-head"><div><span className="eyebrow">Score model</span><h2>Expected goals</h2></div></div><div className="xg"><div><span>{labels[0]}</span><strong>{prediction.data?.lambda_a.toFixed(2) ?? '—'}</strong></div><b>—</b><div><span>{labels[2]}</span><strong>{prediction.data?.lambda_b.toFixed(2) ?? '—'}</strong></div></div><ScoreMatrix matrix={prediction.data?.score_distribution} /></section></div>
+    {tactical && matchup ? <TacticalFit teamA={labels[0]} teamB={labels[2]} tactical={tactical} matchup={matchup} /> : prediction.isSuccess && <section className="card"><p className="tactical-narrative">Tactical style data is not available yet for one or both teams (need prior group-stage PMSR reports).</p></section>}
+  </>
+}
+
 function MatchPage() {
   const { id } = useParams()
   const match = useQuery<Match>({ queryKey: ['match', id], queryFn: () => api(`/matches/${id}`) })
   const prediction = useQuery<MatchPrediction>({ queryKey: ['prediction', id], queryFn: () => api(`/matches/${id}/prediction`) })
   const labels = [match.data?.team_a.name ?? 'Team A', 'Draw', match.data?.team_b.name ?? 'Team B']
+  const tactical = prediction.data?.tactical_stats
+  const matchup = prediction.data?.style_matchup
   return <><PageHeader eyebrow={`Match ${match.data?.official_match_number ?? ''}`} title={`${labels[0]} vs ${labels[2]}`} detail="Normal-time probabilities. Knockout advancement accounts for extra time and penalties separately." actions={<NavLink className="button ghost" to="/matches">All matches</NavLink>} />
     <div className="two-col"><section className="card"><div className="card-head"><div><span className="eyebrow">Final blend</span><h2>Outcome probabilities</h2></div><span className="quality">{prediction.data?.data_quality?.replace('_', ' ')}</span></div>
       <div className="outcome-grid">{prediction.data && Object.values(prediction.data.final).map((value, index) => <div key={labels[index]}><span>{labels[index]}</span><strong>{percent(value)}</strong><i style={{ width: percent(value) }} /></div>)}</div>
       <div className="model-compare"><h3>Market vs model</h3>{labels.map((label, index) => { const key = ['team_a', 'draw', 'team_b'][index]; return <div key={label}><span>{label}</span><small>Model {prediction.data ? percent(prediction.data.model[key]) : '—'}</small><small>Market {prediction.data?.market ? percent(prediction.data.market[key]) : 'No market'}</small></div> })}</div>
+      {prediction.data?.advance_probability_a != null && <div className="advance-prob"><h3>Advance probability</h3><div><span>{labels[0]}</span><strong>{percent(prediction.data.advance_probability_a)}</strong></div><div><span>{labels[2]}</span><strong>{percent(1 - prediction.data.advance_probability_a)}</strong></div></div>}
     </section><section className="card"><div className="card-head"><div><span className="eyebrow">Score model</span><h2>Expected goals</h2></div></div><div className="xg"><div><span>{labels[0]}</span><strong>{prediction.data?.lambda_a.toFixed(2) ?? '—'}</strong></div><b>—</b><div><span>{labels[2]}</span><strong>{prediction.data?.lambda_b.toFixed(2) ?? '—'}</strong></div></div><ScoreMatrix matrix={prediction.data?.score_distribution} /></section></div>
+    {tactical && matchup && <TacticalFit teamA={labels[0]} teamB={labels[2]} tactical={tactical} matchup={matchup} />}
   </>
+}
+
+function TacticalFit({ teamA, teamB, tactical, matchup }: { teamA: string; teamB: string; tactical: TacticalStats; matchup: StyleMatchup }) {
+  const favorLabel = matchup.favor === 'team_a' ? teamA : matchup.favor === 'team_b' ? teamB : 'Even'
+  const maxContrib = Math.max(...matchup.interaction_scores.map(item => Math.abs(item.contribution)), 0.01)
+  const interactionLabel = (label: string) => label.replaceAll('Team A', teamA).replaceAll('Team B', teamB)
+  const narrative = interactionLabel(matchup.narrative)
+  return <section className="card tactical-fit"><div className="card-head"><div><span className="eyebrow">Tactical fit</span><h2>Style matchup</h2></div><span className={`tactical-favor favor-${matchup.favor}`}>{favorLabel}</span></div>
+    <p className="tactical-narrative">{narrative}</p>
+    <div className="tactical-stats-grid">
+      <div><span>{teamA}</span><small>Poss {tactical.possession_a.toFixed(0)}%</small><small>Shots {tactical.shots_a.toFixed(1)}</small><small>SOT {tactical.sot_a.toFixed(1)}</small><strong>xG {tactical.xg_a.toFixed(2)}</strong></div>
+      <div><span>{teamB}</span><small>Poss {tactical.possession_b.toFixed(0)}%</small><small>Shots {tactical.shots_b.toFixed(1)}</small><small>SOT {tactical.sot_b.toFixed(1)}</small><strong>xG {tactical.xg_b.toFixed(2)}</strong></div>
+    </div>
+    <div className="interaction-bars"><h3>Interaction effects</h3>{matchup.interaction_scores.slice(0, 6).map(item => <div key={item.key} className="interaction-row"><span>{interactionLabel(item.label)}</span><div className="interaction-bar"><i style={{ width: `${Math.abs(item.contribution) / maxContrib * 100}%`, background: item.contribution >= 0 ? '#c7ff55' : '#ff6b6b' }} /></div><small>{item.contribution >= 0 ? '+' : ''}{item.contribution.toFixed(2)} xG</small></div>)}</div>
+  </section>
 }
 
 function SimulatorPage() {
@@ -424,7 +517,7 @@ function SidebarPublishedStatus() {
   const { data: latest, isLoading } = useLatestSimulation()
   if (isLoading || !latest) return null
   return <div className="sidebar-published">
-    <span className="eyebrow">Published run</span>
+    <span className="eyebrow">Knockout forecast</span>
     <strong>{latest.iterations.toLocaleString()} trials</strong>
     <small>Seed {latest.seed} · cutoff {new Date(latest.input_cutoff_at).toLocaleDateString()}</small>
   </div>
