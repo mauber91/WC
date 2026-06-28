@@ -13,6 +13,18 @@ from world_cup_api.db.models import (
     BookmakerOdds, Group, Match, PredictionMarketPrice, Simulation, SimulationBracketResult,
     SimulationGroupResult, SimulationTeamR32Rival, SimulationTeamResult, Team, TournamentTeam, IngestionRun,
 )
+from world_cup_api.db.report_models import (
+    MatchReportDocument,
+    MatchReportEvent,
+    MatchReportExtractionRun,
+    MatchReportIssue,
+    MatchReportNetworkEdge,
+    MatchReportObservation,
+    MatchReportPage,
+    MatchReportParticipant,
+    MatchReportSpatialFeature,
+    MatchReportTimeseriesPoint,
+)
 from world_cup_api.db.session import get_db
 from world_cup_api.jobs.scheduler import schedule_simulation
 from world_cup_api.services.predictions import forecast_match, forecast_matches
@@ -330,6 +342,110 @@ def delete_result(match_id: int, db: Session = Depends(get_db)) -> Response:
     return Response(status_code=204)
 
 
+@router.get("/admin/matches/{match_id}/report-data", dependencies=[Depends(require_admin)])
+def match_report_data(
+    match_id: int,
+    limit: int = Query(default=200, ge=1, le=1000),
+    db: Session = Depends(get_db),
+) -> dict:
+    document = db.scalar(
+        select(MatchReportDocument)
+        .where(MatchReportDocument.match_id == match_id)
+        .order_by(MatchReportDocument.created_at.desc())
+        .limit(1)
+    )
+    if not document:
+        raise HTTPException(404, "Match report not found for match")
+    run = db.scalar(
+        select(MatchReportExtractionRun)
+        .where(MatchReportExtractionRun.document_id == document.id, MatchReportExtractionRun.is_active.is_(True))
+        .order_by(MatchReportExtractionRun.created_at.desc())
+        .limit(1)
+    )
+    if not run:
+        raise HTTPException(404, "Active report extraction run not found")
+    pages = db.scalars(
+        select(MatchReportPage)
+        .where(MatchReportPage.run_id == run.id)
+        .order_by(MatchReportPage.page_number)
+    ).all()
+    page_ids = [page.id for page in pages]
+    payload_rows = []
+    if page_ids:
+        from world_cup_api.db.report_models import MatchReportPagePayload
+
+        payload_rows = db.scalars(
+            select(MatchReportPagePayload).where(MatchReportPagePayload.page_id.in_(page_ids))
+        ).all()
+    payloads_by_page: dict[int, list[dict]] = {}
+    for payload in payload_rows:
+        payloads_by_page.setdefault(payload.page_id, []).append(
+            {
+                "type": payload.payload_type,
+                "element_count": payload.element_count,
+                "mapped_count": payload.mapped_count,
+                "decorative_count": payload.decorative_count,
+                "unresolved_count": payload.unresolved_count,
+                "checksum": payload.checksum,
+            }
+        )
+    return {
+        "match_id": match_id,
+        "document": {
+            "id": document.id,
+            "filename": document.filename,
+            "sha256": document.sha256,
+            "official_match_number": document.official_match_number,
+            "status": document.status,
+            "page_count": document.page_count,
+            "template_key": document.template_key,
+            "template_version": document.template_version,
+            "created_at": document.created_at,
+            "updated_at": document.updated_at,
+        },
+        "run": {
+            "id": run.id,
+            "status": run.status,
+            "pipeline_version": run.pipeline_version,
+            "template_version": run.template_version,
+            "attempt": run.attempt,
+            "quality_score": run.quality_score,
+            "coverage": run.coverage,
+            "artifact_root": run.artifact_root,
+            "stats": run.stats_json,
+            "errors": run.error_json or [],
+            "created_at": run.created_at,
+            "completed_at": run.completed_at,
+        },
+        "pages": [
+            {
+                "id": page.id,
+                "page_number": page.page_number,
+                "page_type": page.page_type,
+                "section": page.section,
+                "team_scope": page.team_scope,
+                "team_id": page.team_id,
+                "width_points": page.width_points,
+                "height_points": page.height_points,
+                "rotation": page.rotation,
+                "render_uri": page.render_uri,
+                "classification_confidence": page.classification_confidence,
+                "raw_element_count": page.raw_element_count,
+                "payloads": payloads_by_page.get(page.id, []),
+            }
+            for page in pages
+        ],
+        "participants": [_participant_payload(row) for row in _limited_rows(db, MatchReportParticipant, run.id, limit)],
+        "observations": [_observation_payload(row) for row in _limited_rows(db, MatchReportObservation, run.id, limit)],
+        "events": [_event_payload(row) for row in _limited_rows(db, MatchReportEvent, run.id, limit)],
+        "spatial_features": [_spatial_feature_payload(row) for row in _limited_rows(db, MatchReportSpatialFeature, run.id, limit)],
+        "network_edges": [_network_edge_payload(row) for row in _limited_rows(db, MatchReportNetworkEdge, run.id, limit)],
+        "timeseries_points": [_timeseries_point_payload(row) for row in _limited_rows(db, MatchReportTimeseriesPoint, run.id, limit)],
+        "issues": [_issue_payload(row) for row in _limited_rows(db, MatchReportIssue, run.id, limit)],
+        "limit": limit,
+    }
+
+
 @router.post("/admin/imports/{dataset}/preview", dependencies=[Depends(require_admin)])
 async def import_preview(dataset: str, file: UploadFile = File(...), source: str = Form("manual-csv"),
                          db: Session = Depends(get_db)) -> dict:
@@ -369,6 +485,168 @@ def data_freshness(db: Session = Depends(get_db)) -> list[dict]:
         output.append({"dataset_type": dataset, "fresh_at": latest.source_cutoff_at if latest else None,
                        "status": latest.status if latest else "never_imported"})
     return output
+
+
+def _limited_rows(db: Session, model, run_id: str, limit: int) -> list:
+    return db.scalars(select(model).where(model.run_id == run_id).order_by(model.id).limit(limit)).all()
+
+
+def _participant_payload(row: MatchReportParticipant) -> dict:
+    return {
+        "id": row.id,
+        "page_id": row.page_id,
+        "team_id": row.team_id,
+        "squad_player_id": row.squad_player_id,
+        "team_source_name": row.team_source_name,
+        "source_name": row.source_name,
+        "normalized_name": row.normalized_name,
+        "shirt_number": row.shirt_number,
+        "position": row.position,
+        "formation_role": row.formation_role,
+        "is_starter": row.is_starter,
+        "is_substitute": row.is_substitute,
+        "is_captain": row.is_captain,
+        "source_bbox": row.source_bbox_json,
+        "source_element_ids": row.source_element_ids_json,
+        "method": row.method,
+        "confidence": row.confidence,
+    }
+
+
+def _observation_payload(row: MatchReportObservation) -> dict:
+    return {
+        "id": row.id,
+        "page_id": row.page_id,
+        "scope": row.scope,
+        "team_id": row.team_id,
+        "participant_id": row.participant_id,
+        "metric_key": row.metric_key,
+        "value_numeric": row.value_numeric,
+        "value_text": row.value_text,
+        "unit": row.unit,
+        "period": row.period,
+        "phase": row.phase,
+        "dimensions": row.dimensions_json,
+        "is_explicit_zero": row.is_explicit_zero,
+        "is_blank": row.is_blank,
+        "source_bbox": row.source_bbox_json,
+        "source_element_ids": row.source_element_ids_json,
+        "method": row.method,
+        "confidence": row.confidence,
+    }
+
+
+def _event_payload(row: MatchReportEvent) -> dict:
+    return {
+        "id": row.id,
+        "page_id": row.page_id,
+        "team_id": row.team_id,
+        "participant_id": row.participant_id,
+        "event_type": row.event_type,
+        "event_number": row.event_number,
+        "minute": row.minute,
+        "added_time": row.added_time,
+        "match_second": row.match_second,
+        "period": row.period,
+        "category": row.category,
+        "outcome": row.outcome,
+        "body_part": row.body_part,
+        "raw_start": [row.raw_start_x, row.raw_start_y],
+        "raw_end": [row.raw_end_x, row.raw_end_y],
+        "normalized_start": [row.norm_start_x, row.norm_start_y],
+        "normalized_end": [row.norm_end_x, row.norm_end_y],
+        "pitch_start_m": [row.pitch_start_x_m, row.pitch_start_y_m],
+        "pitch_end_m": [row.pitch_end_x_m, row.pitch_end_y_m],
+        "coordinate_space": row.coordinate_space,
+        "attacking_direction": row.attacking_direction,
+        "length_m": row.length_m,
+        "angle_degrees": row.angle_degrees,
+        "attributes": row.attributes_json,
+        "source_bbox": row.source_bbox_json,
+        "source_element_ids": row.source_element_ids_json,
+        "method": row.method,
+        "confidence": row.confidence,
+    }
+
+
+def _spatial_feature_payload(row: MatchReportSpatialFeature) -> dict:
+    return {
+        "id": row.id,
+        "page_id": row.page_id,
+        "team_id": row.team_id,
+        "participant_id": row.participant_id,
+        "feature_type": row.feature_type,
+        "geometry_type": row.geometry_type,
+        "coordinate_space": row.coordinate_space,
+        "raw_geometry": row.raw_geometry_json,
+        "normalized_geometry": row.normalized_geometry_json,
+        "canonical_geometry": row.canonical_geometry_json,
+        "category": row.category,
+        "phase": row.phase,
+        "value_numeric": row.value_numeric,
+        "unit": row.unit,
+        "attributes": row.attributes_json,
+        "source_element_ids": row.source_element_ids_json,
+        "method": row.method,
+        "confidence": row.confidence,
+    }
+
+
+def _network_edge_payload(row: MatchReportNetworkEdge) -> dict:
+    return {
+        "id": row.id,
+        "page_id": row.page_id,
+        "team_id": row.team_id,
+        "source_participant_id": row.source_participant_id,
+        "target_participant_id": row.target_participant_id,
+        "source_player_name": row.source_player_name,
+        "target_player_name": row.target_player_name,
+        "pass_count": row.pass_count,
+        "pass_share": row.pass_share,
+        "attributes": row.attributes_json,
+        "source_bbox": row.source_bbox_json,
+        "source_element_ids": row.source_element_ids_json,
+        "method": row.method,
+        "confidence": row.confidence,
+    }
+
+
+def _timeseries_point_payload(row: MatchReportTimeseriesPoint) -> dict:
+    return {
+        "id": row.id,
+        "page_id": row.page_id,
+        "team_id": row.team_id,
+        "participant_id": row.participant_id,
+        "team_source_name": row.team_source_name,
+        "series_key": row.series_key,
+        "period": row.period,
+        "minute": row.minute,
+        "match_second": row.match_second,
+        "value": row.value,
+        "unit": row.unit,
+        "raw": [row.raw_x, row.raw_y],
+        "attributes": row.attributes_json,
+        "source_element_ids": row.source_element_ids_json,
+        "method": row.method,
+        "confidence": row.confidence,
+    }
+
+
+def _issue_payload(row: MatchReportIssue) -> dict:
+    return {
+        "id": row.id,
+        "page_id": row.page_id,
+        "severity": row.severity,
+        "code": row.code,
+        "message": row.message,
+        "artifact_type": row.artifact_type,
+        "source_bbox": row.source_bbox_json,
+        "source_element_ids": row.source_element_ids_json,
+        "evidence": row.evidence_json,
+        "is_resolved": row.is_resolved,
+        "resolution_note": row.resolution_note,
+        "created_at": row.created_at,
+    }
 
 
 def _match_prediction_payload(match, forecast, sources: list[dict], has_external_market: bool) -> dict:

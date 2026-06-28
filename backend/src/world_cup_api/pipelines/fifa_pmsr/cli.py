@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import shutil
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -20,6 +21,11 @@ from world_cup_api.pipelines.fifa_pmsr.types import ExtractionBundle
 
 
 DEFAULT_ARTIFACT_ROOT = ROOT_DIR / "data" / "processed" / "match_reports"
+
+
+def _configure_vendor_logging() -> None:
+    for logger_name in ("pypdf", "pdfminer"):
+        logging.getLogger(logger_name).setLevel(logging.ERROR)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -97,6 +103,7 @@ def _run_batch(directory: Path, pattern: str, workers: int) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    _configure_vendor_logging()
     args = _parser().parse_args(argv)
     try:
         if args.command == "inspect":

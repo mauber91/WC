@@ -11,6 +11,7 @@ from pypdf import PdfReader
 
 from world_cup_api.pipelines.fifa_pmsr.classify import classify_page
 from world_cup_api.pipelines.fifa_pmsr.render import render_pages
+from world_cup_api.pipelines.fifa_pmsr.teams import ReportTeams
 from world_cup_api.pipelines.fifa_pmsr.types import RawPage
 
 
@@ -101,7 +102,12 @@ def _extract_images(reader_page: Any, page_number: int, image_dir: Path) -> list
     return output
 
 
-def extract_raw_pages(pdf_path: str | Path, artifact_dir: str | Path) -> list[RawPage]:
+def extract_raw_pages(
+    pdf_path: str | Path,
+    artifact_dir: str | Path,
+    *,
+    teams: ReportTeams | None = None,
+) -> list[RawPage]:
     source = Path(pdf_path)
     root = Path(artifact_dir)
     render_info = render_pages(source, root / "renders")
@@ -118,7 +124,7 @@ def extract_raw_pages(pdf_path: str | Path, artifact_dir: str | Path) -> list[Ra
                 raw_text = reader_page.extract_text(extraction_mode="layout") or ""
             except Exception:
                 raw_text = reader_page.extract_text() or ""
-            classification = classify_page(raw_text, page_number, page_count)
+            classification = classify_page(raw_text, page_number, page_count, teams=teams)
 
             chars: list[dict[str, Any]] = []
             for char_index, char in enumerate(page.chars):

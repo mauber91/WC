@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from world_cup_api.pipelines.fifa_pmsr.teams import ReportTeams
 from world_cup_api.pipelines.fifa_pmsr.types import PageClassification
 
 
@@ -20,29 +21,30 @@ def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text.replace("\x00", "f")).strip()
 
 
-def _team_scope(text: str) -> str | None:
-    first = _clean(text)[:180]
-    matches = re.findall(r"\b(Brazil|Haiti)\b", first, flags=re.IGNORECASE)
-    if len(matches) == 1:
-        return matches[0].title()
-    return None
-
-
-def classify_page(text: str, page_number: int, page_count: int) -> PageClassification:
+def classify_page(
+    text: str,
+    page_number: int,
+    page_count: int,
+    *,
+    teams: ReportTeams | None = None,
+) -> PageClassification:
     cleaned = _clean(text)
     low = cleaned.lower()
     compact = re.sub(r"[^a-z]", "", low)
     page_type = "unknown"
     anchors: list[str] = []
 
-    if compact.startswith("inpossessionbrazilvhaiti"):
-        page_type, anchors = "in_possession_section", ["IN POSSESSION teams section"]
-    elif compact.startswith("outofpossessionbrazilvhaiti"):
-        page_type, anchors = "out_of_possession_section", ["OUT OF POSSESSION teams section"]
-    elif compact.startswith("goalkeepingbrazilvhaiti"):
-        page_type, anchors = "goalkeeping_section", ["GOALKEEPING teams section"]
-    elif compact.startswith("setplaysbrazilvhaiti"):
-        page_type, anchors = "set_plays_section", ["SET PLAYS teams section"]
+    if teams is not None:
+        section_headers = (
+            ("in_possession_section", "IN POSSESSION teams section", "inpossession"),
+            ("out_of_possession_section", "OUT OF POSSESSION teams section", "outofpossession"),
+            ("goalkeeping_section", "GOALKEEPING teams section", "goalkeeping"),
+            ("set_plays_section", "SET PLAYS teams section", "setplays"),
+        )
+        for candidate_type, anchor, prefix in section_headers:
+            if compact.startswith(teams.compact_header(prefix)):
+                page_type, anchors = candidate_type, [anchor]
+                break
 
     rules = [
         ("cover", "post match summary report"),
@@ -110,7 +112,7 @@ def classify_page(text: str, page_number: int, page_count: int) -> PageClassific
     return PageClassification(
         page_type=page_type,
         section=section,
-        team_scope=_team_scope(cleaned),
+        team_scope=teams.matches_scope(cleaned) if teams is not None else None,
         confidence=confidence,
         matched_anchors=anchors,
     )

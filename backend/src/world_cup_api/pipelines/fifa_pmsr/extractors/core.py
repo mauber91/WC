@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 from world_cup_api.domain.name_match import normalize_name
+from world_cup_api.pipelines.fifa_pmsr.teams import ReportTeams
 from world_cup_api.pipelines.fifa_pmsr.types import (
     EventRecord,
     IssueRecord,
@@ -167,7 +168,7 @@ def _participant_from_side(
     return participant, events
 
 
-def _extract_participants(page: RawPage, result: CoreExtraction) -> None:
+def _extract_participants(page: RawPage, result: CoreExtraction, teams: ReportTeams) -> None:
     substitute_top = 10_000.0
     for word in _words(page):
         if str(word.get("text", "")).upper() == "SUBSTITUTES":
@@ -179,7 +180,8 @@ def _extract_participants(page: RawPage, result: CoreExtraction) -> None:
             continue
         left = [word for word in row if float((word.get("bbox") or [0])[0]) < 315]
         right = [word for word in row if float((word.get("bbox") or [0])[0]) > 700]
-        for team, side, side_words in (("Brazil", "left", left), ("Haiti", "right", right)):
+        for side, team in teams.side_pairs():
+            side_words = left if side == "left" else right
             if not side_words:
                 continue
             participant, events = _participant_from_side(
@@ -205,7 +207,7 @@ def _parse_number(value: str) -> float | None:
     return float(match.group()) if match else None
 
 
-def _extract_key_statistics(page: RawPage, result: CoreExtraction) -> None:
+def _extract_key_statistics(page: RawPage, result: CoreExtraction, teams: ReportTeams) -> None:
     lines = [line.strip() for line in page.raw_text.splitlines() if line.strip()]
     possession = re.search(
         r"Total\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%\s+Total",
@@ -213,7 +215,7 @@ def _extract_key_statistics(page: RawPage, result: CoreExtraction) -> None:
         flags=re.IGNORECASE,
     )
     if possession:
-        for team, value in (("Brazil", possession.group(1)), ("Haiti", possession.group(3))):
+        for team, value in ((teams.home_team, possession.group(1)), (teams.away_team, possession.group(3))):
             result.observations.append(
                 ObservationRecord(
                     page_number=page.page_number,
@@ -245,7 +247,7 @@ def _extract_key_statistics(page: RawPage, result: CoreExtraction) -> None:
         if not any(character.isdigit() for character in left + right):
             continue
         unit = "%" if "%" in left or "%" in right else "km" if "km" in left or "km" in right else None
-        for team, raw_value in (("Brazil", left), ("Haiti", right)):
+        for team, raw_value in ((teams.home_team, left), (teams.away_team, right)):
             numeric = _parse_number(raw_value)
             result.observations.append(
                 ObservationRecord(
@@ -560,15 +562,26 @@ def _extract_meter_labels(page: RawPage, result: CoreExtraction) -> None:
         )
 
 
-def extract_core_semantics(pages: list[RawPage]) -> CoreExtraction:
+def extract_core_semantics(pages: list[RawPage], *, teams: ReportTeams | None = None) -> CoreExtraction:
     result = CoreExtraction()
+    if teams is None:
+        result.issues.append(
+            IssueRecord(
+                page_number=1,
+                severity="error",
+                code="match_teams_missing",
+                message="Cover-page home and away teams are required for core extraction",
+                artifact_type="text",
+            )
+        )
+        return result
     for page in pages:
         _extract_table_cells(page, result)
         page_type = page.classification.page_type
         if page_type == "match_summary_teams":
-            _extract_participants(page, result)
+            _extract_participants(page, result, teams)
         elif page_type == "key_statistics":
-            _extract_key_statistics(page, result)
+            _extract_key_statistics(page, result, teams)
         elif page_type == "physical_data":
             _extract_physical(page, result)
         elif page_type == "passing_network":

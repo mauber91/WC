@@ -27,7 +27,10 @@ def _json_metadata(metadata: Any) -> dict[str, Any]:
 
 def _cover_fields(text: str) -> dict[str, Any]:
     cleaned = text.replace("\x00", "f")
-    versus = re.search(r"(?P<home>[A-Za-z .'-]+?)\s+(?P<hscore>\d+)\s*-\s*(?P<ascore>\d+)\s*\n?\s*(?P<away>[A-Za-z .'-]+?)\s*(?:\n|Group)", cleaned)
+    versus = re.search(
+        r"(?P<home>[A-Za-z .'-]+?)\s*(?P<hscore>\d+)\s*-\s*(?P<ascore>\d+)\s*\n\s*(?P<away>[A-Za-z .'-]+?)\s*(?:\n|Group)",
+        cleaned,
+    )
     match_no = re.search(r"Match\s+(\d+)", cleaned, flags=re.IGNORECASE)
     date = re.search(r"(\d{1,2}\s+[A-Za-z]+\s+20\d{2})", cleaned)
     kickoff = re.search(r"(\d{1,2}:\d{2})\s+Kick", cleaned, flags=re.IGNORECASE)

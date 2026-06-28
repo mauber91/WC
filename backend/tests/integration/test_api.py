@@ -95,3 +95,11 @@ def test_upcoming_match_uses_seeded_market_odds() -> None:
         assert expected_platforms <= {
             source["platform"] for source in payload["market_sources"] if source.get("platform")
         }
+
+
+def test_admin_match_report_data_returns_404_when_not_ingested() -> None:
+    with TestClient(app) as client:
+        match = client.get("/api/v1/matches").json()[0]
+        response = client.get(f"/api/v1/admin/matches/{match['id']}/report-data")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Match report not found for match"

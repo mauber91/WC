@@ -5,6 +5,7 @@ from math import hypot
 from typing import Any
 
 from world_cup_api.pipelines.fifa_pmsr.coordinates import PitchTransform, normalize_goal_mouth_point
+from world_cup_api.pipelines.fifa_pmsr.teams import ReportTeams
 from world_cup_api.pipelines.fifa_pmsr.types import (
     EventRecord,
     IssueRecord,
@@ -323,12 +324,12 @@ def _extract_line_height_polygons(page: RawPage, result: VisualExtraction) -> No
         )
 
 
-def _extract_goalkeeper_timeline(page: RawPage, result: VisualExtraction) -> None:
+def _extract_goalkeeper_timeline(page: RawPage, result: VisualExtraction, teams: ReportTeams) -> None:
     if page.classification.page_type != "goalkeeper_involvement":
         return
     charts = [
-        ("Brazil", (35.0, 170.0, 755.0, 236.0), 235.0),
-        ("Haiti", (35.0, 390.0, 755.0, 456.0), 455.5),
+        (teams.home_team, (35.0, 170.0, 755.0, 236.0), 235.0),
+        (teams.away_team, (35.0, 390.0, 755.0, 456.0), 455.5),
     ]
     seen: set[tuple[str, int]] = set()
     for vector in page.payloads.get("vectors", []):
@@ -372,6 +373,7 @@ def _extract_formations(
     page: RawPage,
     participants: list[ParticipantRecord],
     result: VisualExtraction,
+    teams: ReportTeams,
 ) -> None:
     if page.classification.page_type != "match_summary_teams":
         return
@@ -381,7 +383,7 @@ def _extract_formations(
         for participant in participants
         if participant.is_starter
     }
-    team_points: dict[str, list[tuple[float, float]]] = {"Brazil": [], "Haiti": []}
+    team_points: dict[str, list[tuple[float, float]]] = {teams.home_team: [], teams.away_team: []}
     for word in page.payloads.get("text_spans", []):
         raw_text = str(word.get("text", ""))
         if len(raw_text) % 2 == 0 and raw_text and all(
@@ -397,12 +399,12 @@ def _extract_formations(
         y = (float(bbox[1]) + float(bbox[3])) / 2
         if not _inside(x, y, pitch_bbox):
             continue
-        team = "Brazil" if x < 480 else "Haiti"
+        team = teams.home_team if x < 480 else teams.away_team
         shirt_number = int(text)
         player_name = participant_lookup.get((team, shirt_number))
         if player_name is None:
             continue
-        direction = "right" if team == "Brazil" else "left"
+        direction = "right" if team == teams.home_team else "left"
         point = PitchTransform(pitch_bbox, attacking_direction=direction).point(x, y)
         normalized_x = point["norm_x"]
         role = (
@@ -555,6 +557,8 @@ def extract_visual_semantics(
     pages: list[RawPage],
     attempt_details: dict[tuple[str, int], dict[str, Any]],
     participants: list[ParticipantRecord] | None = None,
+    *,
+    teams: ReportTeams | None = None,
 ) -> VisualExtraction:
     result = VisualExtraction()
     participants = participants or []
@@ -564,7 +568,8 @@ def extract_visual_semantics(
         _extract_markers(page, result)
         _extract_arrows(page, result)
         _extract_line_height_polygons(page, result)
-        _extract_goalkeeper_timeline(page, result)
-        _extract_formations(page, participants, result)
+        if teams is not None:
+            _extract_goalkeeper_timeline(page, result, teams)
+            _extract_formations(page, participants, result, teams)
         _extract_disciplinary_markers(page, participants, result)
     return result

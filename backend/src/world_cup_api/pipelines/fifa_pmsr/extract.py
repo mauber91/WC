@@ -9,6 +9,7 @@ from world_cup_api.pipelines.fifa_pmsr.extractors.core import PUA_DIGIT_MAP
 from world_cup_api.pipelines.fifa_pmsr.fontmap import write_font_map_registry
 from world_cup_api.pipelines.fifa_pmsr.inspect import inspect_report
 from world_cup_api.pipelines.fifa_pmsr.raw import extract_raw_pages
+from world_cup_api.pipelines.fifa_pmsr.teams import ReportTeams
 from world_cup_api.pipelines.fifa_pmsr.template import load_template
 from world_cup_api.pipelines.fifa_pmsr.types import ExtractionBundle
 from world_cup_api.pipelines.fifa_pmsr.validate import calculate_quality, validate_bundle
@@ -59,9 +60,10 @@ def extract_report(
     definition = load_template(manifest.template_key or "fifa_pmsr_2026")
     root = Path(artifact_root).expanduser().resolve() / manifest.sha256[:16] / PIPELINE_VERSION
     root.mkdir(parents=True, exist_ok=True)
-    pages = extract_raw_pages(path, root)
-    core = extract_core_semantics(pages)
-    visual = extract_visual_semantics(pages, core.attempt_details, core.participants)
+    teams = ReportTeams.from_manifest(manifest.home_team, manifest.away_team)
+    pages = extract_raw_pages(path, root, teams=teams)
+    core = extract_core_semantics(pages, teams=teams)
+    visual = extract_visual_semantics(pages, core.attempt_details, core.participants, teams=teams)
     bundle = ExtractionBundle(
         manifest=manifest,
         pipeline_version=PIPELINE_VERSION,

@@ -11,6 +11,12 @@ from world_cup_api.domain.host_advantage import venue_home_flags
 from world_cup_api.domain.team_strength import SYNTHETIC_BOOKMAKERS, fuse_strength
 from world_cup_api.domain.match_context import group_match_context
 from world_cup_api.modeling.context_params import DEFAULT_CONTEXT_PARAMS
+from world_cup_api.modeling.pmsr_features import (
+    apply_pmsr_to_forecast,
+    index_features_by_match,
+    load_team_match_features,
+    team_rolling_features,
+)
 from world_cup_api.modeling.prediction import MatchForecast, build_forecast, devig, log_pool
 from world_cup_api.services.champion_market_sync import champion_probs_by_team_id
 from world_cup_api.services.tournament_elo import current_tournament_elos
@@ -48,6 +54,8 @@ def forecast_matches(db: Session, match_ids: list[int]) -> dict[int, tuple[Match
     markets = _market_consensus_by_match(db, unique_match_ids)
     contexts = _group_match_contexts(db, known_matches)
     params = DEFAULT_CONTEXT_PARAMS
+    pmsr_features = load_team_match_features(db)
+    pmsr_by_match = index_features_by_match(pmsr_features)
     output: dict[int, tuple[Match, MatchForecast, list[dict], bool]] = {}
 
     for match in known_matches:
@@ -76,7 +84,7 @@ def forecast_matches(db: Session, match_ids: list[int]) -> dict[int, tuple[Match
         host_a, host_b = venue_home_flags(team_a.country_code, team_b.country_code, match.host_country)
         ctx = contexts.get(match.id, {})
         blend_alpha = params.market_blend_alpha if has_external_market else 0.0
-        output[match.id] = (match, build_forecast(
+        forecast = build_forecast(
             elo_a, elo_b, market, host_a, host_b,
             rest_a=ctx.get("rest_a", 0.0),
             rest_b=ctx.get("rest_b", 0.0),
@@ -89,7 +97,28 @@ def forecast_matches(db: Session, match_ids: list[int]) -> dict[int, tuple[Match
             goal_dispersion=params.goal_dispersion,
             market_blend_alpha=blend_alpha,
             host_advantage=params.host_advantage_elo,
-        ), sources, has_external_market)
+        )
+        rolling_a = team_rolling_features(
+            pmsr_features,
+            pmsr_by_match,
+            match.team_a_id,
+            match.official_match_number,
+        )
+        rolling_b = team_rolling_features(
+            pmsr_features,
+            pmsr_by_match,
+            match.team_b_id,
+            match.official_match_number,
+        )
+        forecast = apply_pmsr_to_forecast(
+            forecast,
+            rolling_a,
+            rolling_b,
+            alpha_xg=params.pmsr_alpha_xg,
+            goal_dispersion=params.goal_dispersion,
+            market_blend_alpha=blend_alpha,
+        )
+        output[match.id] = (match, forecast, sources, has_external_market)
     return output
 
 def _latest_rating(db: Session, team_id: int, kind: str, default: float) -> float:

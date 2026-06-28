@@ -3,6 +3,10 @@ from __future__ import annotations
 import pytest
 
 from world_cup_api.pipelines.fifa_pmsr.classify import classify_page
+from world_cup_api.pipelines.fifa_pmsr.teams import ReportTeams
+
+
+TEAMS = ReportTeams(home_team="Brazil", away_team="Haiti")
 
 
 @pytest.mark.parametrize(
@@ -19,4 +23,4 @@ from world_cup_api.pipelines.fifa_pmsr.classify import classify_page
     ],
 )
 def test_template_page_classifier(text: str, page_number: int, expected: str) -> None:
-    assert classify_page(text, page_number, 52).page_type == expected
+    assert classify_page(text, page_number, 52, teams=TEAMS).page_type == expected

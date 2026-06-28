@@ -1,4 +1,4 @@
-.PHONY: setup dev-api dev-web dev-remote release remote-setup ssh-tunnel spark-ping spark-sync spark-setup spark-dev spark-tunnel test lint build migrate benchmark report-inspect report-extract report-ingest publish deploy deploy-sim deploy-ui deploy-fly deploy-pages
+.PHONY: setup dev-api dev-web dev-remote release remote-setup ssh-tunnel spark-ping spark-sync spark-setup spark-dev spark-tunnel test lint build migrate benchmark report-inspect report-extract report-ingest report-batch-ingest pmsr-backtest pmsr-features publish deploy deploy-sim deploy-ui deploy-fly deploy-pages
 
 setup:
 	cd backend && uv sync
@@ -109,3 +109,15 @@ report-extract:
 
 report-ingest:
 	cd backend && uv run world-cup-report ingest "$(FILE)"
+
+REPORT_DIR ?= ../fifa_world_cup_2026_match_reports
+REPORT_WORKERS ?= 4
+
+report-batch-ingest:
+	cd backend && uv run world-cup-report batch "$(REPORT_DIR)" --workers $(REPORT_WORKERS)
+
+pmsr-backtest:
+	cd backend && uv run python ../scripts/pmsr_backtest.py $(ARGS)
+
+pmsr-features:
+	cd backend && uv run python ../scripts/pmsr_backtest.py --features-only

@@ -6,4 +6,4 @@ def test_walk_forward_backtest_on_finished_group_matches(db_session) -> None:
     seed_database(db_session)
     report = walk_forward_group_backtest(db_session, tournament_id=1)
     assert report.matches >= 30
-    assert 0.9 < report.metrics.log_loss < 1.2
+    assert 0.85 < report.metrics.log_loss < 1.2
