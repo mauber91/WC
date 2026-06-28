@@ -25,16 +25,24 @@ def _json_metadata(metadata: Any) -> dict[str, Any]:
     return {str(key).lstrip("/"): str(value) for key, value in metadata.items() if value is not None}
 
 
+_TEAM_NAME = r".+?"
+_VERSUS_PATTERN = re.compile(
+    rf"(?P<home>{_TEAM_NAME})\s*(?P<hscore>\d+)\s*-\s*(?P<ascore>\d+)\s*\n\s*(?P<away>{_TEAM_NAME})\s*(?:\n|Group)",
+    re.DOTALL,
+)
+
+
 def _cover_fields(text: str) -> dict[str, Any]:
     cleaned = text.replace("\x00", "f")
-    versus = re.search(
-        r"(?P<home>[A-Za-z .'-]+?)\s*(?P<hscore>\d+)\s*-\s*(?P<ascore>\d+)\s*\n\s*(?P<away>[A-Za-z .'-]+?)\s*(?:\n|Group)",
-        cleaned,
-    )
+    versus = _VERSUS_PATTERN.search(cleaned)
     match_no = re.search(r"Match\s+(\d+)", cleaned, flags=re.IGNORECASE)
     date = re.search(r"(\d{1,2}\s+[A-Za-z]+\s+20\d{2})", cleaned)
     kickoff = re.search(r"(\d{1,2}:\d{2})\s+Kick", cleaned, flags=re.IGNORECASE)
-    venue = re.search(r"Kick\s+O[f]+\s*\n?\s*([^\n]+?(?:Stadium|Arena))", cleaned, flags=re.IGNORECASE)
+    venue = re.search(
+        r"Kick\s+O[f]+\s*\n?\s*([^\n]+?)(?:\s*\n\s*POST|\s*$)",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
     fields: dict[str, Any] = {
         "official_match_number": int(match_no.group(1)) if match_no else None,
         "match_date": date.group(1) if date else None,

@@ -16,6 +16,13 @@ SECTION_BY_TYPE = {
     "individual_physical_section": "individual_physical",
 }
 
+SECTION_PREFIX_FALLBACKS = (
+    ("in_possession_section", "IN POSSESSION section", "in possession"),
+    ("out_of_possession_section", "OUT OF POSSESSION section", "out of possession"),
+    ("goalkeeping_section", "GOALKEEPING section", "goalkeeping"),
+    ("set_plays_section", "SET PLAYS section", "set plays"),
+)
+
 
 def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text.replace("\x00", "f")).strip()
@@ -43,6 +50,13 @@ def classify_page(
         )
         for candidate_type, anchor, prefix in section_headers:
             if compact.startswith(teams.compact_header(prefix)):
+                page_type, anchors = candidate_type, [anchor]
+                break
+
+    if page_type == "unknown":
+        first_line = text.replace("\x00", "f").splitlines()[0].strip().lower() if text else ""
+        for candidate_type, anchor, title in SECTION_PREFIX_FALLBACKS:
+            if first_line == title:
                 page_type, anchors = candidate_type, [anchor]
                 break
 

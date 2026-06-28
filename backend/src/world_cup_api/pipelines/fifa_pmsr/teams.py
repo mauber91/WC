@@ -26,7 +26,7 @@ class ReportTeams:
         found = [
             team
             for team in (self.home_team, self.away_team)
-            if re.search(rf"\b{re.escape(team)}\b", first, flags=re.IGNORECASE)
+            if team.lower() in first.lower()
         ]
         if len(found) == 1:
             return found[0]
