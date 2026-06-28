@@ -157,6 +157,7 @@ class StyleMatchup:
     net_xg_delta_a: float
     interactions: tuple[StyleInteractionScore, ...]
     narrative: str
+    overall_favor: str = "even"
 
 
 @dataclass(frozen=True)
@@ -760,6 +761,112 @@ def predict_tactical_stats(
     )
 
 
+def _overall_favor(lambda_a: float, lambda_b: float, *, margin: float = 0.12) -> str:
+    if lambda_a - lambda_b > margin:
+        return "team_a"
+    if lambda_b - lambda_a > margin:
+        return "team_b"
+    return "even"
+
+
+def _tactical_insight_sentence(
+    interactions: tuple[StyleInteractionScore, ...],
+    team_a_name: str,
+    team_b_name: str,
+) -> str:
+    if not interactions:
+        return ""
+    top = max(interactions, key=lambda item: abs(item.contribution))
+    if abs(top.contribution) < 0.02:
+        return ""
+    if top.key == "possession_low_block_a" and top.contribution < 0:
+        return (
+            f" {team_a_name}'s possession game may struggle against "
+            f"{team_b_name}'s low block ({top.contribution:+.2f} xG)."
+        )
+    if top.key == "possession_low_block_b" and top.contribution > 0:
+        return (
+            f" {team_b_name}'s possession game may struggle against "
+            f"{team_a_name}'s low block ({-top.contribution:+.2f} xG)."
+        )
+    return f" Standout interaction: {top.label} ({top.contribution:+.2f} xG)."
+
+
+def compose_style_narrative(
+    team_a_name: str,
+    team_b_name: str,
+    lambda_a: float,
+    lambda_b: float,
+    style_favor: str,
+    delta_a: float,
+    interactions: tuple[StyleInteractionScore, ...],
+) -> str:
+    """Blend overall xG favorite with tactical style edge for the UI summary."""
+    overall = _overall_favor(lambda_a, lambda_b)
+    xg_summary = f"{lambda_a:.2f} vs {lambda_b:.2f} xG"
+    if overall == "team_a":
+        quality = f"{team_a_name} are favored overall ({xg_summary})"
+    elif overall == "team_b":
+        quality = f"{team_b_name} are favored overall ({xg_summary})"
+    else:
+        quality = f"The teams look evenly matched on quality ({xg_summary})"
+
+    if style_favor == "team_a":
+        tactical = f"{team_a_name}'s attacking style fits this matchup better ({delta_a:+.2f} xG edge)"
+    elif style_favor == "team_b":
+        tactical = f"{team_b_name}'s style fits this matchup better ({abs(delta_a):.2f} xG edge)"
+    else:
+        tactical = "tactical styles are evenly matched"
+
+    insight = _tactical_insight_sentence(interactions, team_a_name, team_b_name)
+
+    if overall == style_favor:
+        if overall == "even":
+            return f"{quality}, and {tactical}."
+        return f"{quality}, and {tactical}—ratings and tactics point the same way.{insight}"
+
+    if overall == "even":
+        if style_favor == "even":
+            return f"{quality}."
+        return f"{quality}, but {tactical}.{insight}"
+
+    overall_name = team_a_name if overall == "team_a" else team_b_name
+    if style_favor == "even":
+        return f"{quality}. Tactical styles are evenly matched—{overall_name} carry the quality edge.{insight}"
+
+    tactical_name = team_a_name if style_favor == "team_a" else team_b_name
+    return (
+        f"{quality}, but {tactical_name}'s style fits better tactically "
+        f"({abs(delta_a):.2f} xG style edge)—{overall_name} remain favored on overall strength.{insight}"
+    )
+
+
+def finalize_style_matchup(
+    matchup: StyleMatchup,
+    *,
+    team_a_name: str,
+    team_b_name: str,
+    lambda_a: float,
+    lambda_b: float,
+) -> StyleMatchup:
+    overall = _overall_favor(lambda_a, lambda_b)
+    return StyleMatchup(
+        favor=matchup.favor,
+        net_xg_delta_a=matchup.net_xg_delta_a,
+        interactions=matchup.interactions,
+        narrative=compose_style_narrative(
+            team_a_name,
+            team_b_name,
+            lambda_a,
+            lambda_b,
+            matchup.favor,
+            matchup.net_xg_delta_a,
+            matchup.interactions,
+        ),
+        overall_favor=overall,
+    )
+
+
 def score_style_matchup(
     profile_a: TeamStyleProfile,
     profile_b: TeamStyleProfile,
@@ -767,6 +874,8 @@ def score_style_matchup(
     team_a_name: str = "Team A",
     team_b_name: str = "Team B",
     model: StyleModelBundle | None = None,
+    lambda_a: float | None = None,
+    lambda_b: float | None = None,
 ) -> StyleMatchup:
     model = model or _cached_style_model()
     interactions = interaction_features(profile_a, profile_a, profile_b, profile_b)
@@ -811,20 +920,26 @@ def score_style_matchup(
     delta_a = float(np.clip(delta_a, -0.2, 0.2))
     if delta_a > 0.05:
         favor = "team_a"
-        narrative = f"{team_a_name}'s attacking style fits this matchup better ({delta_a:+.2f} xG edge)."
     elif delta_a < -0.05:
         favor = "team_b"
-        narrative = f"{team_b_name}'s attacking style fits this matchup better ({delta_a:+.2f} xG edge)."
     else:
         favor = "even"
-        narrative = "Tactical styles are evenly matched."
-    headline = scores[0] if scores else None
-    if headline and headline.key == "possession_low_block_a" and headline.value > 0.45 and headline.contribution < 0:
-        narrative = (
-            f"{team_a_name}'s possession game vs {team_b_name}'s low block looks unfavorable "
-            f"({headline.contribution:+.2f} xG)."
+    interaction_tuple = tuple(scores)
+    if lambda_a is not None and lambda_b is not None:
+        narrative = compose_style_narrative(
+            team_a_name, team_b_name, lambda_a, lambda_b, favor, delta_a, interaction_tuple
         )
-    return StyleMatchup(favor=favor, net_xg_delta_a=round(delta_a, 3), interactions=tuple(scores), narrative=narrative)
+        overall = _overall_favor(lambda_a, lambda_b)
+    else:
+        narrative = "Tactical style breakdown available."
+        overall = "even"
+    return StyleMatchup(
+        favor=favor,
+        net_xg_delta_a=round(delta_a, 3),
+        interactions=interaction_tuple,
+        narrative=narrative,
+        overall_favor=overall,
+    )
 
 
 def apply_style_to_forecast(
@@ -854,6 +969,14 @@ def apply_style_to_forecast(
     lambda_a = float(np.clip(forecast.lambda_a + delta, 0.15, 3.0))
     lambda_b = float(np.clip(forecast.lambda_b - delta, 0.15, 3.0))
     tactical = predict_tactical_stats(lambda_a, lambda_b, profile_a, profile_b, model=model)
+    if matchup is not None:
+        matchup = finalize_style_matchup(
+            matchup,
+            team_a_name=team_a_name,
+            team_b_name=team_b_name,
+            lambda_a=lambda_a,
+            lambda_b=lambda_b,
+        )
     if lambda_a == forecast.lambda_a and lambda_b == forecast.lambda_b:
         return forecast, tactical, matchup
     raw_matrix = score_matrix(lambda_a, lambda_b, goal_dispersion=goal_dispersion)

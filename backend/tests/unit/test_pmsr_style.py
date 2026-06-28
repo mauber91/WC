@@ -6,6 +6,7 @@ from world_cup_api.modeling.pmsr_features import TeamMatchPmsrFeatures
 from world_cup_api.modeling.pmsr_style import (
     TeamMatchStyleFeatures,
     build_team_style_profile,
+    compose_style_narrative,
     compute_percentile_bounds,
     index_style_features_by_match,
     interaction_features,
@@ -75,3 +76,19 @@ def test_possession_vs_low_block_interaction_is_shrunk_and_clamped() -> None:
     matchup = score_style_matchup(high_possession, low_block, team_a_name="Spain", team_b_name="Uruguay")
     # Style edge is clamped to a small nudge, never a blowout.
     assert -0.2 <= matchup.net_xg_delta_a <= 0.2
+
+
+def test_compose_style_narrative_notes_overall_favorite_when_tactics_disagree() -> None:
+    narrative = compose_style_narrative(
+        "England",
+        "Congo DR",
+        lambda_a=2.02,
+        lambda_b=0.90,
+        style_favor="team_b",
+        delta_a=-0.08,
+        interactions=(),
+    )
+    assert "England are favored overall" in narrative
+    assert "Congo DR" in narrative
+    assert "style fits better tactically" in narrative
+    assert "remain favored on overall strength" in narrative

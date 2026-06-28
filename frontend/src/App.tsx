@@ -38,6 +38,7 @@ type TacticalStats = {
 type StyleInteraction = { key: string; label: string; value: number; coefficient: number; contribution: number }
 type StyleMatchup = {
   favor: 'team_a' | 'team_b' | 'even'
+  overall_favor?: 'team_a' | 'team_b' | 'even'
   net_xg_delta_a: number
   narrative: string
   interaction_scores: StyleInteraction[]
@@ -341,11 +342,16 @@ function MatchPage() {
 }
 
 function TacticalFit({ teamA, teamB, tactical, matchup }: { teamA: string; teamB: string; tactical: TacticalStats; matchup: StyleMatchup }) {
-  const favorLabel = matchup.favor === 'team_a' ? teamA : matchup.favor === 'team_b' ? teamB : 'Even'
+  const tacticalLabel = matchup.favor === 'team_a' ? teamA : matchup.favor === 'team_b' ? teamB : 'Even'
+  const overallLabel = matchup.overall_favor === 'team_a' ? teamA : matchup.overall_favor === 'team_b' ? teamB : null
+  const splitFavor = overallLabel && matchup.overall_favor !== matchup.favor && matchup.favor !== 'even'
   const maxContrib = Math.max(...matchup.interaction_scores.map(item => Math.abs(item.contribution)), 0.01)
   const interactionLabel = (label: string) => label.replaceAll('Team A', teamA).replaceAll('Team B', teamB)
   const narrative = interactionLabel(matchup.narrative)
-  return <section className="card tactical-fit"><div className="card-head"><div><span className="eyebrow">Tactical fit</span><h2>Style matchup</h2></div><span className={`tactical-favor favor-${matchup.favor}`}>{favorLabel}</span></div>
+  return <section className="card tactical-fit"><div className="card-head"><div><span className="eyebrow">Tactical fit</span><h2>Style matchup</h2></div><div className="tactical-badges">
+    {overallLabel && <span className="tactical-favor favor-overall">Overall: {overallLabel}</span>}
+    <span className={`tactical-favor favor-${matchup.favor}${splitFavor ? ' favor-tactical' : ''}`}>{splitFavor ? `Style: ${tacticalLabel}` : tacticalLabel}</span>
+  </div></div>
     <p className="tactical-narrative">{narrative}</p>
     <div className="tactical-stats-grid">
       <div><span>{teamA}</span><small>Poss {tactical.possession_a.toFixed(0)}%</small><small>Shots {tactical.shots_a.toFixed(1)}</small><small>SOT {tactical.sot_a.toFixed(1)}</small><strong>xG {tactical.xg_a.toFixed(2)}</strong></div>

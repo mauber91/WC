@@ -709,6 +709,7 @@ def _match_prediction_payload(result: MatchForecastResult) -> dict:
         matchup = result.style_matchup
         style_payload: dict[str, object] = {
             "favor": matchup.favor,
+            "overall_favor": matchup.overall_favor,
             "net_xg_delta_a": matchup.net_xg_delta_a,
             "narrative": matchup.narrative,
             "interaction_scores": [
